@@ -1,0 +1,129 @@
+## 📋 REQUISITOS TÉCNICOS
+
+**BACKEND:**
+- Python Flask com SQLAlchemy ORM
+- SQLite para banco de dados
+- Estrutura em POO com separação de concerns
+- API RESTful para operações CRUD
+
+**FRONTEND:**
+- HTML5 + CSS3 + JavaScript puro
+- Bootstrap 5 para UI/UX
+- Design responsivo e elegante para casamento
+
+## 🗃️ MODELAGEM DE DADOS
+
+**ENTIDADES PRINCIPAIS:**
+
+1. **Presente**
+   - id (Integer, PK)
+   - nome (String)
+   - descricao (String)
+   - valor_total (Float)
+   - valor_arrecadado (Float, default=0)
+   - ativo (Boolean, default=True)
+   - created_at (DateTime)
+
+2. **Contribuicao**
+   - id (Integer, PK)
+   - presente_id (Integer, FK)
+   - nome_contribuinte (String)
+   - email_contribuinte (String)
+   - valor (Float)
+   - mensagem (Text)
+   - status (String: 'pendente', 'aprovado', 'cancelado')
+   - created_at (DateTime)
+
+## 🎨 INTERFACE DO USUÁRIO
+
+**PÁGINA PRINCIPAL (/):**
+- Header com nomes dos noivos e data do casamento
+- Lista de presentes em cards Bootstrap
+- Cada card deve mostrar:
+  - Nome e descrição do presente
+  - Barra de progresso (valor_arrecadado / valor_total)
+  - Valor restante para completar
+  - Botão "Contribuir"
+
+**MODAL DE CONTRIBUIÇÃO:**
+- Formulário para:
+  - Nome do contribuinte
+  - Email
+  - Valor da contribuição (com validação)
+  - Mensagem opcional
+  - Botão "Pagar com Mercado Pago"
+
+## 🔄 FLUXO DE PAGAMENTO
+
+1. Usuário clica em "Contribuir"
+2. Abre modal com formulário de contribuição
+3. Ao submeter, cria preferência no Mercado Pago
+4. Redireciona para checkout
+5. Webhook atualiza status da contribuição
+
+## 🛠️ ESTRUTURA DE ARQUIVOS
+
+/wedding-gift-list/
+├── app.py
+├── config.py
+├── database.py
+├── models/
+│ ├── init.py
+│ ├── presente.py
+│ └── contribuicao.py
+├── services/
+│ ├── init.py
+│ └── mercado_pago_service.py
+├── routes/
+│ ├── init.py
+│ ├── present_routes.py
+│ └── payment_routes.py
+├── templates/
+│ ├── base.html
+│ ├── index.html
+│ └── components/
+│ └── gift_card.html
+├── static/
+│ ├── css/
+│ │ ├── style.css
+│ │ └── wedding-theme.css
+│ ├── js/
+│ │ └── app.js
+│ └── images/
+
+## 📝 ENDPOINTS DA API
+
+**GET /api/presentes** - Lista todos os presentes ativos
+**POST /api/contribuir** - Cria uma contribuição e retorna link do Mercado Pago
+**POST /api/webhook/mercadopago** - Webhook para atualizar status do pagamento
+
+## 🎁 FUNCIONALIDADES ESPECÍFICAS
+
+1. **Barra de progresso** em tempo real
+2. **Validação** para não permitir contribuição maior que valor restante
+3. **Design temático** para casamento (cores suaves, elementos românticos)
+4. **Responsividade** total
+5. **Feedback visual** durante o processo de pagamento
+
+## 🔒 SEGURANÇA
+
+- Validação de dados no backend
+- Sanitização de inputs
+- Rate limiting básico
+- Tratamento de erros genérico
+
+## 💡 EXTRAS DESEJÁVEIS
+
+- Efeitos hover suaves nos cards
+- Animação de confirmação após contribuição
+- Modo escuro/claro
+- Compartilhamento nas redes sociais
+
+**IMPLEMENTE:**
+- Código completo backend Flask
+- Templates HTML com Bootstrap
+- JavaScript para interações
+- CSS personalizado com tema de casamento
+- Configuração do Mercado Pago
+- Sistema de webhooks
+- Documentação básica de setup

@@ -1,0 +1,348 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="text-center mb-5">
+            <h2 class="section-title">Nossa Lista de Presentes</h2>
+            <p class="text-muted">Escolha como quer nos presentear! Aceitamos PIX e Cartão.</p>
+        </div>
+
+        <div class="row" id="lista-presentes">
+            {% for presente in presentes %}
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card gift-card h-100">
+                    
+                    <img src="{{ presente.imagem_url or 'https://via.placeholder.com/300x200?text=Presente' }}" 
+                         class="card-img-top gift-image" 
+                         alt="{{ presente.nome }}"
+                         onerror="this.src='https://via.placeholder.com/300x200?text=Presente'">
+                    
+                    <div class="card-body text-center">
+                        <h5 class="card-title">{{ presente.nome }}</h5>
+                        <p class="card-text text-muted small">{{ presente.descricao }}</p>
+                        
+                        <div class="gift-price mb-3">
+                            <span class="h4 text-primary">R$ {{ "%.2f"|format(presente.valor_total) }}</span>
+                        </div>
+
+                        {% if presente.valor_arrecadado > 0 %}
+                        <div class="progress mb-2" style="height: 6px;">
+                            <div class="progress-bar" 
+                                 role="progressbar" 
+                                 style="width: {{ presente.progresso_porcentagem }}%"
+                                 aria-valuenow="{{ presente.progresso_porcentagem }}" 
+                                 aria-valuemin="0" 
+                                 aria-valuemax="100">
+                            </div>
+                        </div>
+                        <small class="text-muted">
+                            R$ {{ "%.2f"|format(presente.valor_arrecadado) }} arrecadado
+                        </small>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="card-footer bg-transparent border-0 pb-3">
+                        <button class="btn btn-primary w-100 btn-presentear" 
+                                data-presente-id="{{ presente.id }}"
+                                data-presente-nome="{{ presente.nome }}"
+                                data-presente-valor="{{ presente.valor_total }}">
+                            <i class="fas fa-gift me-2"></i>Presentear
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalPagamento" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Presentear: <span id="modal-presente-nome"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formPagamento">
+                    <input type="hidden" id="presente_id" name="presente_id">
+                    <input type="hidden" id="presente_valor" name="presente_valor">
+                    
+                    <div class="mb-3">
+                        <label for="nome" class="form-label">Seu Nome *</label>
+                        <input type="text" class="form-control" id="nome" name="nome" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Seu Email *</label>
+                        <input type="email" class="form-control" id="email" name="email" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="valor" class="form-label">Valor do Presente (R$) *</label>
+                        <input type="number" class="form-control" id="valor" name="valor" 
+                               min="1" step="0.01" required>
+                        <div class="form-text">Valor sugerido: R$ <span id="valor-sugerido">0.00</span></div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="mensagem" class="form-label">Mensagem para o casal (opcional)</label>
+                        <textarea class="form-control" id="mensagem" name="mensagem" rows="2" 
+                                  placeholder="Deixe uma mensagem carinhosa..."></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Método de Pagamento *</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="metodo_pagamento" 
+                                   id="pix" value="pix" checked>
+                            <label class="form-check-label" for="pix">
+                                <i class="fas fa-qrcode me-2"></i>PIX (Chave: 83991314075)
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="metodo_pagamento" 
+                                   id="cartao" value="cartao">
+                            <label class="form-check-label" for="cartao">
+                                <i class="fas fa-credit-card me-2"></i>Cartão (Mercado Pago)
+                            </label>
+                        </div>
+                    </div>
+
+                    <div id="info-pix" class="alert alert-info">
+                        <h6><i class="fas fa-info-circle me-2"></i>Como pagar via PIX:</h6>
+                        <ol class="small mb-0">
+                            <li>Faça o PIX para: <strong>83991314075</strong></li>
+                            <li>Envie o comprovante para nós</li>
+                            <li>Seu presente será confirmado em até 24h</li>
+                        </ol>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success" id="btnPagarPix">
+                    <i class="fas fa-qrcode me-2"></i>Copiar Chave PIX
+                </button>
+                <button type="button" class="btn btn-primary" id="btnPagarCartao">
+                    <i class="fas fa-credit-card me-2"></i>Pagar com Cartão
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalPix" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Pagamento via PIX</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <div class="alert alert-success">
+                    <h6>Chave PIX Copiada!</h6>
+                    <p class="mb-2"><strong>83991314075</strong></p>
+                    <button class="btn btn-outline-success btn-sm" onclick="copiarChavePix()">
+                        <i class="fas fa-copy me-1"></i>Copiar Novamente
+                    </button>
+                </div>
+                
+                <p class="small text-muted">
+                    <strong>Instruções:</strong><br>
+                    1. Abra seu app do banco<br>
+                    2. Cole a chave PIX<br> 
+                    3. Envie o valor de <strong>R$ <span id="valor-pix">0.00</span></strong><br>
+                    4. Envie o comprovante para nós
+                </p>
+                
+                <div class="mt-3">
+                    <a href="/" class="btn btn-primary">Voltar para Presentes</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+class WeddingGiftApp {
+    constructor() {
+        this.initEventListeners();
+        this.configurarMetodoPagamento();
+    }
+
+    initEventListeners() {
+        // Botões de presentear
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('btn-presentear')) {
+                this.openPagamentoModal(e.target);
+            }
+        });
+
+        // Botão Pagar com PIX
+        document.getElementById('btnPagarPix')?.addEventListener('click', () => {
+            this.processarPix();
+        });
+
+        // Botão Pagar com Cartão
+        document.getElementById('btnPagarCartao')?.addEventListener('click', () => {
+            this.processarCartao();
+        });
+
+        // Alteração do método de pagamento
+        document.querySelectorAll('input[name="metodo_pagamento"]').forEach(radio => {
+            radio.addEventListener('change', () => {
+                this.configurarMetodoPagamento();
+            });
+        });
+    }
+
+    openPagamentoModal(button) {
+        const presenteId = button.dataset.presenteId;
+        const presenteNome = button.dataset.presenteNome;
+        const presenteValor = parseFloat(button.dataset.presenteValor);
+
+        // Preenche o modal
+        document.getElementById('modal-presente-nome').textContent = presenteNome;
+        document.getElementById('presente_id').value = presenteId;
+        document.getElementById('presente_valor').value = presenteValor;
+        document.getElementById('valor-sugerido').textContent = presenteValor.toFixed(2);
+        document.getElementById('valor').value = presenteValor;
+
+        // Limpa e reseta o formulário
+        document.getElementById('formPagamento').reset();
+        document.getElementById('valor').value = presenteValor;
+        
+        // Abre o modal
+        const modal = new bootstrap.Modal(document.getElementById('modalPagamento'));
+        modal.show();
+    }
+
+    configurarMetodoPagamento() {
+        const metodo = document.querySelector('input[name="metodo_pagamento"]:checked').value;
+        const infoPix = document.getElementById('info-pix');
+        const btnPix = document.getElementById('btnPagarPix');
+        const btnCartao = document.getElementById('btnPagarCartao');
+
+        if (metodo === 'pix') {
+            infoPix.style.display = 'block';
+            btnPix.style.display = 'inline-block';
+            btnCartao.style.display = 'none';
+        } else {
+            infoPix.style.display = 'none';
+            btnPix.style.display = 'none';
+            btnCartao.style.display = 'inline-block';
+        }
+    }
+
+    async processarPix() {
+        const form = document.getElementById('formPagamento');
+        
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+
+        const formData = new FormData(form);
+        const data = {
+            presente_id: parseInt(formData.get('presente_id')),
+            nome: formData.get('nome'),
+            email: formData.get('email'),
+            valor: parseFloat(formData.get('valor')),
+            mensagem: formData.get('mensagem'),
+            metodo_pagamento: 'pix'
+        };
+
+        try {
+            // Salva a contribuição
+            const response = await fetch('/api/contribuir', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                // Fecha o modal de pagamento
+                bootstrap.Modal.getInstance(document.getElementById('modalPagamento')).hide();
+                
+                // Preenche e abre modal PIX
+                document.getElementById('valor-pix').textContent = data.valor.toFixed(2);
+                this.copiarChavePix();
+                
+                const modalPix = new bootstrap.Modal(document.getElementById('modalPix'));
+                modalPix.show();
+            } else {
+                throw new Error(result.error);
+            }
+
+        } catch (error) {
+            this.showError(error.message);
+        }
+    }
+
+    async processarCartao() {
+        const form = document.getElementById('formPagamento');
+        
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+
+        const formData = new FormData(form);
+        const data = {
+            presente_id: parseInt(formData.get('presente_id')),
+            nome: formData.get('nome'),
+            email: formData.get('email'),
+            valor: parseFloat(formData.get('valor')),
+            mensagem: formData.get('mensagem'),
+            metodo_pagamento: 'cartao'
+        };
+
+        try {
+            const response = await fetch('/api/contribuir', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                // Redireciona para Mercado Pago
+                window.location.href = result.payment_url;
+            } else {
+                throw new Error(result.error);
+            }
+
+        } catch (error) {
+            this.showError(error.message);
+        }
+    }
+
+    copiarChavePix() {
+        const chavePix = '83991314075';
+        navigator.clipboard.writeText(chavePix).then(() => {
+            console.log('Chave PIX copiada: ' + chavePix);
+        }).catch(err => {
+            console.error('Erro ao copiar: ', err);
+        });
+    }
+
+    showError(message) {
+        alert(`Erro: ${message}`);
+    }
+}
+
+// Inicializa a aplicação
+document.addEventListener('DOMContentLoaded', () => {
+    new WeddingGiftApp();
+});
+</script>
+{% endblock %}
