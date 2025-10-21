@@ -16,7 +16,7 @@ class MercadoPagoService:
         
         # Em produção, usa a URL real do site
         if os.environ.get('RENDER'):
-            base_url = Config.https://lista-presente-divertida.onrender.com/
+            base_url = Config.SITE_URL
         
         preference_data = {
             "items": [
