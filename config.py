@@ -37,29 +37,27 @@ class Config:
     SITE_URL = os.environ.get('SITE_URL', 'https://lista-presente-divertida.onrender.com')
 
     
-    # Database - Render usa DATABASE_URL, converte para PostgreSQL
-    DATABASE_URL = os.environ.get('DATABASE_URL')
-    
-    # Em produção, requer uma URL de banco de dados válida
+    # Database - Configuração específica para Neon DB com SSL
     if PRODUCTION:
-        if not DATABASE_URL:
-            raise ValueError("⚠️ DATABASE_URL não configurada em produção!")
-        # Converte postgres:// para postgresql:// (necessário para o SQLAlchemy)
-        if DATABASE_URL.startswith('postgres://'):
-            DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
-        SQLALCHEMY_DATABASE_URI = DATABASE_URL
+        # URL fixa do Neon com configurações SSL corretas
+        SQLALCHEMY_DATABASE_URI = 'postgresql://neondb_owner:npg_HxOB9K6dlsfp@ep-late-firefly-a430xok0.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require'
     else:
-        # Em desenvolvimento, usa SQLite por padrão
-        SQLALCHEMY_DATABASE_URI = DATABASE_URL or 'sqlite:///wedding_gifts.db'
+        # Em desenvolvimento, usa SQLite
+        SQLALCHEMY_DATABASE_URI = 'sqlite:///wedding_gifts.db'
     
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
-    # Configurações de conexão do banco
+    # Configurações de conexão do banco otimizadas para Neon
     SQLALCHEMY_ENGINE_OPTIONS = {
-        'pool_size': 5,
+        'pool_size': 1,  # Menor pool para evitar muitas conexões
         'max_overflow': 2,
         'pool_timeout': 30,
-        'pool_recycle': 1800
+        'pool_recycle': 1800,
+        'pool_pre_ping': True,  # Verifica conexões antes de usar
+        'connect_args': {
+            'sslmode': 'require',
+            'options': '-c timezone=UTC'
+        }
     }
     
     # Configurações do Casal
