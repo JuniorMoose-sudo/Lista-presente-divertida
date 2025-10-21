@@ -3,8 +3,7 @@ import mercadopago
 from config import Config
 
 # Inicializa SDK com o access token do Mercado Pago
-sdk = mercadopago.SDK(Config.MERCADO_PAGO_ACCESS_TOKEN)
-
+sdk = mercadopago.SDK(Config.MERCADOPAGO_ACCESS_TOKEN)
 
 def criar_preferencia_pagamento(presente, contribuicao, base_url):
     """

@@ -4,6 +4,8 @@ from datetime import datetime
 class Config:
     # Segurança
     SECRET_KEY = os.environ.get('SECRET_KEY', 'chave-secreta-padrao-mudar-em-producao')
+    MERCADOPAGO_ACCESS_TOKEN = os.environ.get("MERCADOPAGO_ACCESS_TOKEN")
+
     
     # Database - Render usa DATABASE_URL, converte para PostgreSQL
     DATABASE_URL = os.environ.get('DATABASE_URL')
