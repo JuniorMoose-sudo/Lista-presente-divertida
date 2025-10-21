@@ -20,3 +20,6 @@ class Config:
     # Configurações do Casal
     NOIVO_NOME = "Junior & Karol"
     DATA_CASAMENTO = "24 de Janeiro de 2026"
+
+    # URL do site
+    SITE_URL = os.environ.get('SITE_URL', 'https://lista-presente-divertida.onrender.com')
