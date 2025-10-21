@@ -110,30 +110,55 @@ def criar_contribuicao():
 
 @payment_bp.route('/webhook/mercadopago', methods=['POST'])
 def webhook_mercadopago():
+    """Webhook para produção - com validações"""
     try:
+        # Log do webhook recebido
+        print("🔔 Webhook recebido do Mercado Pago")
+        
         data = request.get_json()
+        
+        if not data:
+            print("❌ Webhook sem dados")
+            return jsonify({'success': False, 'error': 'No data'}), 400
+        
+        # Processa o webhook
         mp_service = MercadoPagoService()
         resultado = mp_service.processar_webhook(data)
         
         if resultado:
             contribuicao = Contribuicao.query.get(resultado['contribuicao_id'])
+            
             if contribuicao:
                 status_mp = resultado['status']
+                print(f"📊 Atualizando contribuição {contribuicao.id} para status: {status_mp}")
+                
                 if status_mp == 'approved':
                     contribuicao.status = 'aprovado'
-                    # Atualiza valor arrecadado
                     presente = contribuicao.presente
-                    presente.valor_arrecadado += contribuicao.valor
+                    presente.valor_arrecadado += float(contribuicao.valor)
+                    print(f"✅ Pagamento aprovado - R$ {contribuicao.valor}")
+                    
                 elif status_mp in ['cancelled', 'rejected']:
                     contribuicao.status = 'cancelado'
+                    print(f"❌ Pagamento cancelado/rejeitado")
+                
+                elif status_mp == 'in_process':
+                    contribuicao.status = 'pendente'
+                    print(f"⏳ Pagamento em processamento")
+                
+                elif status_mp == 'refunded':
+                    contribuicao.status = 'reembolsado'
+                    print(f"↩️ Pagamento reembolsado")
                 
                 db.session.commit()
-                print(f"✅ Webhook processado - Contribuição {contribuicao.id}: {status_mp}")
+                print(f"✅ Webhook processado com sucesso")
         
         return jsonify({'success': True})
         
     except Exception as e:
-        print(f"Erro no webhook: {e}")
+        print(f"💥 Erro no webhook: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False}), 500
 
 @payment_bp.route('/obrigado')
