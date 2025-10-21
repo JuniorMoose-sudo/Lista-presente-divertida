@@ -280,8 +280,8 @@ def webhook_mercadopago():
                 print(f"↩️ Pagamento reembolsado")
                 db.session.commit()
                 print(f"✅ Webhook processado com sucesso")
-        
-        return jsonify({'success': True})
+                
+                return jsonify({'success': True})
         
     except Exception as e:
         print(f"💥 Erro no webhook: {e}")
