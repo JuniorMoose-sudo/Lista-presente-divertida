@@ -45,6 +45,15 @@ def criar_contribuicao():
         data = request.get_json()
         print(f"📨 Dados recebidos: {data}")  # DEBUG
 
+        # Extrai CPF e telefone (protege caso data seja None)
+        cpf = ''
+        telefone = ''
+        if data:
+            cpf = data.get('cpf', '')
+            if isinstance(cpf, str):
+                cpf = cpf.replace('.', '').replace('-', '')
+            telefone = data.get('telefone', '')
+
         # Validação básica
         if not data or not all(k in data for k in ['presente_id', 'nome', 'email', 'valor']):
             return jsonify({
@@ -71,6 +80,8 @@ def criar_contribuicao():
             presente_id=presente.id,
             nome_contribuinte=data['nome'],
             email_contribuinte=data['email'],
+            cpf_contribuinte=cpf,           # ✅ NOVO
+            telefone_contribuinte=telefone, # ✅ NOVO
             valor=valor_contribuicao,
             mensagem=data.get('mensagem', ''),
             status='pendente'

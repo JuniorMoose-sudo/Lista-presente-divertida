@@ -78,6 +78,18 @@
                         <label for="email" class="form-label">Seu Email *</label>
                         <input type="email" class="form-control" id="email" name="email" required>
                     </div>
+
+                    <div class="mb-3">
+                        <label for="cpf" class="form-label">CPF *</label>
+                        <input type="text" class="form-control" id="cpf" name="cpf" 
+                               placeholder="000.000.000-00" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="telefone" class="form-label">Telefone/WhatsApp *</label>
+                        <input type="tel" class="form-control" id="telefone" name="telefone" 
+                               placeholder="(11) 99999-9999" required>
+                    </div>
                     
                     <div class="mb-3">
                         <label for="valor" class="form-label">Valor do Presente (R$) *</label>
@@ -247,8 +259,11 @@ class WeddingGiftApp {
         const formData = new FormData(form);
         const data = {
             presente_id: parseInt(formData.get('presente_id')),
+            presente_nome: document.getElementById('modal-presente-nome').textContent,
             nome: formData.get('nome'),
             email: formData.get('email'),
+            cpf: formData.get('cpf'),           // ✅ NOVO
+            telefone: formData.get('telefone'), // ✅ NOVO
             valor: parseFloat(formData.get('valor')),
             mensagem: formData.get('mensagem'),
             metodo_pagamento: 'pix'
@@ -296,8 +311,11 @@ class WeddingGiftApp {
         const formData = new FormData(form);
         const data = {
             presente_id: parseInt(formData.get('presente_id')),
+            presente_nome: document.getElementById('modal-presente-nome').textContent,
             nome: formData.get('nome'),
             email: formData.get('email'),
+            cpf: formData.get('cpf'),           // ✅ NOVO
+            telefone: formData.get('telefone'), // ✅ NOVO
             valor: parseFloat(formData.get('valor')),
             mensagem: formData.get('mensagem'),
             metodo_pagamento: 'cartao'

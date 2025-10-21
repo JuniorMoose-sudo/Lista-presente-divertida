@@ -8,6 +8,9 @@ class Contribuicao(db.Model):
     presente_id = db.Column(db.Integer, db.ForeignKey('presentes.id'), nullable=False)
     nome_contribuinte = db.Column(db.String(100), nullable=False)
     email_contribuinte = db.Column(db.String(100), nullable=False)
+    # Novos campos para CPF e Telefone
+    cpf_contribuinte = db.Column(db.String(20))
+    telefone_contribuinte = db.Column(db.String(30))
     valor = db.Column(db.Numeric(10, 2), nullable=False)  # Mudei de Float para Numeric
     mensagem = db.Column(db.Text)
     status = db.Column(db.String(20), default='pendente')

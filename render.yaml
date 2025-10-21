@@ -4,7 +4,7 @@ services:
     env: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
+    startCommand: gunicorn -c gunicorn.conf.py app:app
     envVars:
       - key: SECRET_KEY
         generateValue: true
@@ -12,3 +12,21 @@ services:
         fromDatabase:
           name: wedding_db
           property: connectionString
+      - key: SENTRY_DSN
+        sync: false  # Configurar manualmente
+      - key: MERCADOPAGO_WEBHOOK_SECRET
+        generateValue: true
+      - key: REDIS_URL
+        sync: false  # Configurar se usar Redis
+      - key: FLASK_ENV
+        value: production
+      - key: RENDER
+        value: true
+      - key: CORS_ORIGINS
+        value: https://*.onrender.com,https://lista-presente-divertida.onrender.com
+    healthCheckPath: /healthz
+    scaling:
+      minInstances: 1
+      maxInstances: 3
+      targetMemoryPercent: 80
+    autoDeploy: true

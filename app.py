@@ -1,10 +1,13 @@
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request
 from dotenv import load_dotenv
 from config import Config
 from database import db, init_db
 from routes import register_routes
 from models.presente import Presente
+from security import init_security, cache, logger
+from production import init_production, validate_request_json
 import os
+import time
 
 load_dotenv()
 
@@ -12,18 +15,29 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
     
+    # Registra tempo de início para uptime
+    app.start_time = time.time()
+    
     # Inicializa banco de dados
     init_db(app)
+    
+    # Inicializa segurança (CORS, Rate Limit, Cache)
+    init_security(app)
+    
+    # Inicializa configurações de produção se necessário
+    if Config.PRODUCTION:
+        init_production(app)
     
     # Registra rotas
     register_routes(app)
     
     # Rota principal
     @app.route('/')
+    @cache.cached(timeout=300)  # Cache por 5 minutos
     def index():
         try:
             presentes = Presente.query.filter_by(ativo=True).all()
-            print(f"🎁 Carregando {len(presentes)} presentes")
+            logger.info("presentes_carregados", quantidade=len(presentes))
             return render_template('index.html', 
                                  presentes=presentes,
                                  noivo_nome=Config.NOIVO_NOME,

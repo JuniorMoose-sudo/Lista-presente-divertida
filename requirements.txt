@@ -1,6 +1,15 @@
 Flask
 Flask-SQLAlchemy
+Flask-Caching==2.0.2
+Flask-Limiter==3.3.0
+Flask-CORS==4.0.0
+Flask-Compress==1.13
+redis==4.5.4
 mercadopago
 python-dotenv
 gunicorn
 psycopg2-binary
+structlog==23.1.0
+bleach==6.0.0
+psutil==5.9.5
+sentry-sdk[flask]==1.31.0

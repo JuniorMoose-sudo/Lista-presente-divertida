@@ -10,11 +10,82 @@ class MercadoPagoService:
             raise ValueError("⚠️ MERCADOPAGO_ACCESS_TOKEN não configurado corretamente.")
         self.sdk = mercadopago.SDK(access_token)
 
+    def _limpar_telefone(self, telefone):
+        """Remove caracteres especiais do telefone e valida formato"""
+        if not telefone:
+            raise ValueError("Telefone é obrigatório")
+        
+        # Remove todos os caracteres não numéricos
+        numeros = ''.join(filter(str.isdigit, telefone))
+        
+        # Valida o tamanho (considerando números BR: 11/10 dígitos com DDD)
+        if len(numeros) not in [10, 11]:
+            raise ValueError(
+                "Telefone inválido. Formato esperado: (XX) XXXX-XXXX ou (XX) 9XXXX-XXXX"
+            )
+        
+        return numeros
+
+    def _validar_cpf(self, cpf):
+        """Valida e limpa o CPF"""
+        if not cpf:
+            raise ValueError("CPF é obrigatório")
+
+        # Remove caracteres especiais
+        numeros = ''.join(filter(str.isdigit, cpf))
+        
+        # Valida tamanho
+        if len(numeros) != 11:
+            raise ValueError("CPF deve ter 11 dígitos")
+            
+        # Verifica se todos os dígitos são iguais
+        if len(set(numeros)) == 1:
+            raise ValueError("CPF inválido")
+            
+        # Valida dígitos verificadores
+        for i in range(9, 11):
+            valor = sum((int(numeros[j]) * ((i + 1) - j) for j in range(0, i)))
+            digito = ((valor * 10) % 11) % 10
+            if int(numeros[i]) != digito:
+                raise ValueError("CPF inválido")
+                
+        return numeros
+
     def criar_preferencia_pagamento(self, contribuicao, presente, base_url):
         """Cria uma preferência de pagamento no Mercado Pago"""
         try:
-            valor_formatado = f"{float(contribuicao.valor):.2f}"
+            # Validações de segurança adicionais
+            if contribuicao.status != 'pendente':
+                logger.error("invalid_contribution_status",
+                           contribuicao_id=contribuicao.id,
+                           status=contribuicao.status)
+                raise ValueError("Contribuição em estado inválido")
+
+            # Verifica novamente o presente
+            if presente.esta_completo:
+                logger.error("present_already_complete",
+                           presente_id=presente.id)
+                raise ValueError("Presente já completamente pago")
+
+            # Verifica valor novamente
+            valor_atual = float(contribuicao.valor)
+            if valor_atual <= 0 or valor_atual > 10000:
+                logger.error("invalid_amount",
+                           valor=valor_atual)
+                raise ValueError("Valor inválido para pagamento")
+
+            valor_formatado = f"{valor_atual:.2f}"
             nome_comprador = contribuicao.nome_contribuinte
+
+            # Valida e limpa CPF e telefone
+            try:
+                cpf_limpo = self._validar_cpf(contribuicao.cpf_contribuinte)
+                telefone_limpo = self._limpar_telefone(contribuicao.telefone_contribuinte)
+            except ValueError as e:
+                logger.error("validation_error",
+                           error=str(e),
+                           contribuicao_id=contribuicao.id)
+                raise ValueError(f"Dados inválidos: {str(e)}")
 
             print(f"🎯 Criando preferência PRODUÇÃO para R$ {valor_formatado} - {nome_comprador}")
 
@@ -41,7 +112,16 @@ class MercadoPagoService:
                 ],
                 "payer": {
                     "name": contribuicao.nome_contribuinte,
-                    "email": contribuicao.email_contribuinte
+                    "email": contribuicao.email_contribuinte,
+                    # ✅ DADOS REAIS DA PRODUÇÃO (já validados)
+                    "identification": {
+                        "type": "CPF",
+                        "number": cpf_limpo
+                    },
+                    "phone": {
+                        "area_code": telefone_limpo[:2],
+                        "number": telefone_limpo[2:]
+                    }
                 },
                 "back_urls": back_urls,
                 "auto_return": "approved",

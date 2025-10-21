@@ -3,20 +3,108 @@ from database import db
 from models.presente import Presente
 from models.contribuicao import Contribuicao
 from services.mercado_pago_service import MercadoPagoService
+from security import limiter, logger
+from config import Config
+import hmac
+import hashlib
+import time
+import functools
 
 payment_bp = Blueprint('pagamentos', __name__)
 
+def verify_webhook_signature(data, signature):
+    """Verifica a assinatura do webhook do Mercado Pago"""
+    if not Config.MERCADOPAGO_WEBHOOK_SECRET:
+        logger.warning("webhook_secret_missing", message="Chave do webhook não configurada")
+        return True  # Aceita se não configurado
+        
+    calculated = hmac.new(
+        Config.MERCADOPAGO_WEBHOOK_SECRET.encode(),
+        data.encode(),
+        hashlib.sha256
+    ).hexdigest()
+    
+    return hmac.compare_digest(calculated, signature)
+
+def with_retry(max_retries=3, delay=1):
+    """Decorator para adicionar retry em funções"""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            last_error = None
+            for attempt in range(max_retries):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    last_error = e
+                    logger.warning(
+                        "retry_attempt",
+                        function=func.__name__,
+                        attempt=attempt + 1,
+                        max_retries=max_retries,
+                        error=str(e)
+                    )
+                    if attempt < max_retries - 1:
+                        time.sleep(delay * (attempt + 1))
+            logger.error(
+                "max_retries_reached",
+                function=func.__name__,
+                error=str(last_error)
+            )
+            raise last_error
+        return wrapper
+    return decorator
+
+from services.validation_service import ValidationService
+
 @payment_bp.route('/api/contribuir', methods=['POST'])
+@limiter.limit("10/minute")  # Limite de 10 tentativas por minuto por IP
 def criar_contribuicao():
     try:
         data = request.get_json()
-        print(f"📨 Dados recebidos: {data}")
+        logger.info("contribution_request_received", data=data)
         
         # --- Validações básicas ---
-        if not data or not all(k in data for k in ['presente_id', 'nome', 'email', 'valor']):
+        if not data or not all(k in data for k in ['presente_id', 'nome', 'email', 'valor', 'cpf']):
             return jsonify({
                 'success': False,
                 'error': 'Dados incompletos'
+            }), 400
+            
+        # Validações de negócio
+        validation_errors = ValidationService.validar_contribuicao(
+            data['presente_id'],
+            data['valor'],
+            data['email']
+        )
+        
+        if validation_errors:
+            logger.warning("contribution_validation_failed", 
+                         errors=validation_errors,
+                         email=data['email'])
+            return jsonify({
+                'success': False,
+                'error': validation_errors[0],
+                'all_errors': validation_errors
+            }), 422
+            
+        # Verifica limite diário
+        if ValidationService.verificar_valor_maximo_diario(data['email']):
+            logger.warning("daily_limit_exceeded", email=data['email'])
+            return jsonify({
+                'success': False,
+                'error': 'Limite diário de contribuições excedido'
+            }), 429
+            
+        # Verifica disponibilidade do presente
+        disponivel, erro = ValidationService.validar_presente_disponivel(data['presente_id'])
+        if not disponivel:
+            logger.warning("present_unavailable", 
+                         presente_id=data['presente_id'],
+                         error=erro)
+            return jsonify({
+                'success': False,
+                'error': erro
             }), 400
         
         presente = Presente.query.get(data['presente_id'])
@@ -109,47 +197,87 @@ def criar_contribuicao():
         }), 500
 
 @payment_bp.route('/webhook/mercadopago', methods=['POST'])
+@with_retry(max_retries=3, delay=2)  # Retry com backoff exponencial
 def webhook_mercadopago():
-    """Webhook para produção - com validações"""
+    """Webhook para produção - com validações e retry"""
     try:
-        # Log do webhook recebido
-        print("🔔 Webhook recebido do Mercado Pago")
+        logger.info("webhook_received", source="mercadopago")
+        
+        # Validação de assinatura
+        signature = request.headers.get('X-Hub-Signature')
+        if signature:
+            data = request.get_data(as_text=True)
+            if not verify_webhook_signature(data, signature):
+                logger.error("webhook_invalid_signature")
+                return jsonify({'success': False, 'error': 'Invalid signature'}), 401
         
         data = request.get_json()
-        
         if not data:
-            print("❌ Webhook sem dados")
+            logger.error("webhook_no_data")
             return jsonify({'success': False, 'error': 'No data'}), 400
         
-        # Processa o webhook
+        # Processa o webhook com retry
         mp_service = MercadoPagoService()
         resultado = mp_service.processar_webhook(data)
         
-        if resultado:
-            contribuicao = Contribuicao.query.get(resultado['contribuicao_id'])
+        if not resultado:
+            logger.error("webhook_processing_failed")
+            return jsonify({'success': False, 'error': 'Failed to process webhook'}), 422
             
-            if contribuicao:
-                status_mp = resultado['status']
-                print(f"📊 Atualizando contribuição {contribuicao.id} para status: {status_mp}")
+        contribuicao = Contribuicao.query.get(resultado['contribuicao_id'])
+        if not contribuicao:
+            logger.error(
+                "webhook_contribuicao_not_found",
+                contribuicao_id=resultado.get('contribuicao_id')
+            )
+            return jsonify({'success': False, 'error': 'Contribution not found'}), 404
+        
+        status_mp = resultado['status']
+        logger.info(
+            "webhook_updating_status",
+            contribuicao_id=contribuicao.id,
+            old_status=contribuicao.status,
+            new_status=status_mp
+        )
+        
+        try:
+            if status_mp == 'approved':
+                contribuicao.status = 'aprovado'
+                presente = contribuicao.presente
+                valor_anterior = float(presente.valor_arrecadado)
+                presente.valor_arrecadado += float(contribuicao.valor)
                 
-                if status_mp == 'approved':
-                    contribuicao.status = 'aprovado'
-                    presente = contribuicao.presente
-                    presente.valor_arrecadado += float(contribuicao.valor)
-                    print(f"✅ Pagamento aprovado - R$ {contribuicao.valor}")
-                    
-                elif status_mp in ['cancelled', 'rejected']:
-                    contribuicao.status = 'cancelado'
-                    print(f"❌ Pagamento cancelado/rejeitado")
+                logger.info(
+                    "payment_approved",
+                    contribuicao_id=contribuicao.id,
+                    valor=float(contribuicao.valor),
+                    presente_id=presente.id,
+                    valor_anterior=valor_anterior,
+                    valor_atual=float(presente.valor_arrecadado)
+                )
                 
-                elif status_mp == 'in_process':
-                    contribuicao.status = 'pendente'
-                    print(f"⏳ Pagamento em processamento")
+            elif status_mp in ['cancelled', 'rejected']:
+                contribuicao.status = 'cancelado'
+                logger.info(
+                    "payment_cancelled",
+                    contribuicao_id=contribuicao.id,
+                    reason=status_mp
+                )
                 
-                elif status_mp == 'refunded':
-                    contribuicao.status = 'reembolsado'
+            elif status_mp == 'in_process':
+                contribuicao.status = 'pendente'
+                logger.info(
+                    "payment_pending",
+                    contribuicao_id=contribuicao.id
+                )
+                
+            elif status_mp == 'refunded':
+                contribuicao.status = 'reembolsado'
+                logger.info(
+                    "payment_refunded",
+                    contribuicao_id=contribuicao.id
+                )
                     print(f"↩️ Pagamento reembolsado")
-                
                 db.session.commit()
                 print(f"✅ Webhook processado com sucesso")
         
