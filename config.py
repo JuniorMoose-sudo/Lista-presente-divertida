@@ -24,27 +24,44 @@ class Config:
     # Mercado Pago
     MERCADOPAGO_ACCESS_TOKEN = os.environ.get("MERCADOPAGO_ACCESS_TOKEN")
     MERCADOPAGO_WEBHOOK_SECRET = os.environ.get("MERCADOPAGO_WEBHOOK_SECRET")
+    MERCADOPAGO_WEBHOOK_URL = os.environ.get('MERCADOPAGO_WEBHOOK_URL')
     
     if PRODUCTION:
         if not MERCADOPAGO_ACCESS_TOKEN:
             raise ValueError("⚠️ MERCADOPAGO_ACCESS_TOKEN não configurado em produção!")
         if not MERCADOPAGO_WEBHOOK_SECRET:
             raise ValueError("⚠️ MERCADOPAGO_WEBHOOK_SECRET não configurado em produção!")
+        if not MERCADOPAGO_WEBHOOK_URL:
+            raise ValueError("⚠️ MERCADOPAGO_WEBHOOK_URL não configurado em produção!")
+            
     # URL do site
     SITE_URL = os.environ.get('SITE_URL', 'https://lista-presente-divertida.onrender.com')
 
     
     # Database - Render usa DATABASE_URL, converte para PostgreSQL
     DATABASE_URL = os.environ.get('DATABASE_URL')
-    if DATABASE_URL and DATABASE_URL.startswith('postgres://'):
-        DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
     
-    SQLALCHEMY_DATABASE_URI = DATABASE_URL or 'sqlite:///wedding_gifts.db'
+    # Em produção, requer uma URL de banco de dados válida
+    if PRODUCTION:
+        if not DATABASE_URL:
+            raise ValueError("⚠️ DATABASE_URL não configurada em produção!")
+        # Converte postgres:// para postgresql:// (necessário para o SQLAlchemy)
+        if DATABASE_URL.startswith('postgres://'):
+            DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
+        SQLALCHEMY_DATABASE_URI = DATABASE_URL
+    else:
+        # Em desenvolvimento, usa SQLite por padrão
+        SQLALCHEMY_DATABASE_URI = DATABASE_URL or 'sqlite:///wedding_gifts.db'
+    
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
-    # Mercado Pago
-    MERCADOPAGO_ACCESS_TOKEN = os.environ.get('MERCADOPAGO_ACCESS_TOKEN', '')
-    MERCADOPAGO_WEBHOOK_URL = os.environ.get('MERCADOPAGO_WEBHOOK_URL', '')
+    # Configurações de conexão do banco
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_size': 5,
+        'max_overflow': 2,
+        'pool_timeout': 30,
+        'pool_recycle': 1800
+    }
     
     # Configurações do Casal
     NOIVO_NOME = "Junior & Karol"
