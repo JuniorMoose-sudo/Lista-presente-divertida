@@ -240,49 +240,45 @@ def webhook_mercadopago():
             new_status=status_mp
         )
         
-        try:
-            if status_mp == 'approved':
-                contribuicao.status = 'aprovado'
-                presente = contribuicao.presente
-                valor_anterior = float(presente.valor_arrecadado)
-                presente.valor_arrecadado += float(contribuicao.valor)
-                
-                logger.info(
-                    "payment_approved",
-                    contribuicao_id=contribuicao.id,
-                    valor=float(contribuicao.valor),
-                    presente_id=presente.id,
-                    valor_anterior=valor_anterior,
-                    valor_atual=float(presente.valor_arrecadado)
-                )
-                
-            elif status_mp in ['cancelled', 'rejected']:
-                contribuicao.status = 'cancelado'
-                logger.info(
-                    "payment_cancelled",
-                    contribuicao_id=contribuicao.id,
-                    reason=status_mp
-                )
-                
-            elif status_mp == 'in_process':
-                contribuicao.status = 'pendente'
-                logger.info(
-                    "payment_pending",
-                    contribuicao_id=contribuicao.id
-                )
-                
-            elif status_mp == 'refunded':
-                contribuicao.status = 'reembolsado'
-                logger.info(
-                    "payment_refunded",
-                    contribuicao_id=contribuicao.id
-                )
-                print(f"↩️ Pagamento reembolsado")
-                db.session.commit()
-                print(f"✅ Webhook processado com sucesso")
-                
-                return jsonify({'success': True})
+        # Processamento dos diferentes status
+        if status_mp == 'approved':
+            contribuicao.status = 'aprovado'
+            presente = contribuicao.presente
+            valor_anterior = float(presente.valor_arrecadado)
+            presente.valor_arrecadado += float(contribuicao.valor)
+            
+            logger.info(
+                "payment_approved",
+                contribuicao_id=contribuicao.id,
+                valor=float(contribuicao.valor),
+                presente_id=presente.id,
+                valor_anterior=valor_anterior,
+                valor_atual=float(presente.valor_arrecadado)
+            )
+        elif status_mp in ['cancelled', 'rejected']:
+            contribuicao.status = 'cancelado'
+            logger.info(
+                "payment_cancelled",
+                contribuicao_id=contribuicao.id,
+                reason=status_mp
+            )
+        elif status_mp == 'in_process':
+            contribuicao.status = 'pendente'
+            logger.info(
+                "payment_pending",
+                contribuicao_id=contribuicao.id
+            )
+        elif status_mp == 'refunded':
+            contribuicao.status = 'reembolsado'
+            logger.info(
+                "payment_refunded",
+                contribuicao_id=contribuicao.id
+            )
+            print(f"↩️ Pagamento reembolsado")
         
+        db.session.commit()
+        print(f"✅ Webhook processado com sucesso")
+        return jsonify({'success': True})
     except Exception as e:
         print(f"💥 Erro no webhook: {e}")
         import traceback
