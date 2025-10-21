@@ -277,7 +277,7 @@ def webhook_mercadopago():
                     "payment_refunded",
                     contribuicao_id=contribuicao.id
                 )
-                    print(f"↩️ Pagamento reembolsado")
+                print(f"↩️ Pagamento reembolsado")
                 db.session.commit()
                 print(f"✅ Webhook processado com sucesso")
         
