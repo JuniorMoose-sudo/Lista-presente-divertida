@@ -2,6 +2,7 @@
 Configurações de segurança centralizadas para a aplicação.
 Inclui CORS, Rate Limiting e outras medidas de proteção.
 """
+from flask import request
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -21,7 +22,7 @@ cache = Cache()
 limiter = Limiter(
     key_func=get_remote_address,
     default_limits=[Config.RATE_LIMIT_APP],
-    storage_uri=Config.CACHE_REDIS_URL if Config.CACHE_TYPE == 'redis' else "memory://"
+    storage_uri="memory://"  # Usando memória local ao invés de Redis
 )
 
 def init_security(app):

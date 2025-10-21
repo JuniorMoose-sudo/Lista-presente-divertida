@@ -17,8 +17,7 @@ class Config:
     RATE_LIMIT_PAYMENT = os.environ.get('RATE_LIMIT_PAYMENT', '10/minute')  # Limite pagamentos
     
     # Cache
-    CACHE_TYPE = os.environ.get('CACHE_TYPE', 'simple')  # 'simple' ou 'redis'
-    CACHE_REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+    CACHE_TYPE = 'simple'  # Usando cache simples em memória
     CACHE_DEFAULT_TIMEOUT = 300  # 5 minutos
     
     # Mercado Pago
