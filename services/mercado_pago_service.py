@@ -19,8 +19,8 @@ class MercadoPagoService:
         """Cria preferência de pagamento PARA PRODUÇÃO"""
 
         # ✅ Em produção (Render), força a URL real do site
-        if os.environ.get('RENDER'):
-            base_url = Config.SITE_URL
+        if os.environ.get('RENDER') or not base_url.startswith("https://"):
+            base_url = Config.SITE_URL.strip("/")
 
         preference_data = {
             "items": [
