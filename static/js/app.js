@@ -1,19 +1,32 @@
 class WeddingGiftApp {
     constructor() {
         this.initEventListeners();
+        this.configurarMetodoPagamento();
     }
 
     initEventListeners() {
         // Botões de contribuir
         document.addEventListener('click', (e) => {
-            if (e.target.classList.contains('btn-contribuir')) {
-                this.openContributionModal(e.target);
+            if (e.target.classList.contains('btn-presentear')) {
+                this.openPagamentoModal(e.target);
             }
         });
 
-        // Confirmar contribuição
-        document.getElementById('btnConfirmarContribuicao')?.addEventListener('click', () => {
-            this.confirmContribution();
+        // Botão Pagar com PIX
+        document.getElementById('btnPagarPix')?.addEventListener('click', () => {
+            this.processarPix();
+        });
+
+        // Botão Pagar com Cartão
+        document.getElementById('btnPagarCartao')?.addEventListener('click', () => {
+            this.processarCartao();
+        });
+
+        // Alteração do método de pagamento
+        document.querySelectorAll('input[name="metodo_pagamento"]').forEach(radio => {
+            radio.addEventListener('change', () => {
+                this.configurarMetodoPagamento();
+            });
         });
 
         // Validação do valor em tempo real
@@ -22,7 +35,7 @@ class WeddingGiftApp {
         });
     }
 
-    openContributionModal(button) {
+    openPagamentoModal(button) {
         const presenteId = button.dataset.presenteId;
         const presenteNome = button.dataset.presenteNome;
         const valorRestante = parseFloat(button.dataset.valorRestante);
@@ -37,10 +50,10 @@ class WeddingGiftApp {
         document.getElementById('valor').value = '';
 
         // Limpa o formulário
-        document.getElementById('formContribuicao').reset();
+        document.getElementById('formPagamento').reset();
 
         // Abre o modal
-        const modal = new bootstrap.Modal(document.getElementById('modalContribuicao'));
+        const modal = new bootstrap.Modal(document.getElementById('modalPagamento'));
         modal.show();
     }
 
@@ -56,8 +69,25 @@ class WeddingGiftApp {
         }
     }
 
-    async confirmContribution() {
-        const form = document.getElementById('formContribuicao');
+    configurarMetodoPagamento() {
+        const metodo = document.querySelector('input[name="metodo_pagamento"]:checked')?.value;
+        const infoPix = document.getElementById('info-pix');
+        const btnPix = document.getElementById('btnPagarPix');
+        const btnCartao = document.getElementById('btnPagarCartao');
+
+        if (metodo === 'pix') {
+            infoPix.style.display = 'block';
+            btnPix.style.display = 'inline-block';
+            btnCartao.style.display = 'none';
+        } else {
+            infoPix.style.display = 'none';
+            btnPix.style.display = 'none';
+            btnCartao.style.display = 'inline-block';
+        }
+    }
+
+    async processarPix() {
+        const form = document.getElementById('formPagamento');
         
         if (!form.checkValidity()) {
             form.reportValidity();
@@ -67,10 +97,14 @@ class WeddingGiftApp {
         const formData = new FormData(form);
         const data = {
             presente_id: parseInt(formData.get('presente_id')),
+            presente_nome: document.getElementById('modal-presente-nome').textContent,
             nome: formData.get('nome'),
             email: formData.get('email'),
+            cpf: formData.get('cpf'),
+            telefone: formData.get('telefone'),
             valor: parseFloat(formData.get('valor')),
-            mensagem: formData.get('mensagem')
+            mensagem: formData.get('mensagem'),
+            metodo_pagamento: 'pix'
         };
 
         try {
@@ -88,11 +122,64 @@ class WeddingGiftApp {
             const result = await response.json();
 
             if (result.success) {
-                // Fecha os modais
-                bootstrap.Modal.getInstance(document.getElementById('modalContribuicao')).hide();
                 this.hideLoading();
+                // Fecha o modal de pagamento
+                bootstrap.Modal.getInstance(document.getElementById('modalPagamento')).hide();
+                
+                // Preenche e abre modal PIX
+                document.getElementById('valor-pix').textContent = data.valor.toFixed(2);
+                this.copiarChavePix();
+                
+                const modalPix = new bootstrap.Modal(document.getElementById('modalPix'));
+                modalPix.show();
+            } else {
+                throw new Error(result.error);
+            }
 
-                // Redireciona para o pagamento
+        } catch (error) {
+            this.hideLoading();
+            this.showError(error.message);
+        }
+    }
+
+    async processarCartao() {
+        const form = document.getElementById('formPagamento');
+        
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+
+        const formData = new FormData(form);
+        const data = {
+            presente_id: parseInt(formData.get('presente_id')),
+            presente_nome: document.getElementById('modal-presente-nome').textContent,
+            nome: formData.get('nome'),
+            email: formData.get('email'),
+            cpf: formData.get('cpf'),
+            telefone: formData.get('telefone'),
+            valor: parseFloat(formData.get('valor')),
+            mensagem: formData.get('mensagem'),
+            metodo_pagamento: 'cartao'
+        };
+
+        try {
+            // Mostra loading
+            this.showLoading();
+
+            const response = await fetch('/api/contribuir', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                this.hideLoading();
+                // Redireciona para Mercado Pago
                 window.location.href = result.payment_url;
             } else {
                 throw new Error(result.error);
@@ -121,6 +208,15 @@ class WeddingGiftApp {
     showSuccess(message) {
         // Poderia usar um toast mais elaborado aqui
         alert(message);
+    }
+
+    copiarChavePix() {
+        const chavePix = '83991314075';
+        navigator.clipboard.writeText(chavePix).then(() => {
+            console.log('Chave PIX copiada: ' + chavePix);
+        }).catch(err => {
+            console.error('Erro ao copiar: ', err);
+        });
     }
 }
 
