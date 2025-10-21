@@ -5,6 +5,8 @@ class Config:
     # Segurança
     SECRET_KEY = os.environ.get('SECRET_KEY', 'chave-secreta-padrao-mudar-em-producao')
     MERCADOPAGO_ACCESS_TOKEN = os.environ.get("MERCADOPAGO_ACCESS_TOKEN")
+    # URL do site
+    SITE_URL = os.environ.get('SITE_URL', 'https://lista-presente-divertida.onrender.com')
 
     
     # Database - Render usa DATABASE_URL, converte para PostgreSQL
@@ -23,5 +25,4 @@ class Config:
     NOIVO_NOME = "Junior & Karol"
     DATA_CASAMENTO = "24 de Janeiro de 2026"
 
-    # URL do site
-    SITE_URL = os.environ.get('SITE_URL', 'https://lista-presente-divertida.onrender.com')
+    

@@ -19,7 +19,7 @@ class MercadoPagoService:
             print(f"🎯 Criando preferência PRODUÇÃO para R$ {valor_formatado} - {nome_comprador}")
 
             # Corrige a base_url automaticamente se estiver incorreta
-            if os.environ.get("RENDER") or not base_url.startswith("https://"):
+            if not base_url.startswith("https://"):
                 base_url = Config.SITE_URL.strip("/")
 
             print(f"🌐 [DEBUG] Base URL usada: {base_url}")
