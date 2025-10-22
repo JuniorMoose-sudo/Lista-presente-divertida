@@ -15,49 +15,49 @@ def init_sample_data():
             {
                 "nome": "Só para dizer que não dei nada",
                 "descricao": "",
-                "valor_total": 100.00,
+                "valor_total": 89.90,
                 "ativo": True,
                 "imagem_url": "/static/images/julios.png"
             },
             {
                 "nome": "Para o noivo estar coberto de razão",
                 "descricao": "",
-                "valor_total": 80.00,
+                "valor_total": 79.90,
                 "ativo": True,
                 "imagem_url": "/static/images/cobertor.png"
             },
             {
                 "nome": "Dei o MELHOR presente",
                 "descricao": "",
-                "valor_total": 300.00,
+                "valor_total": 299.90,
                 "ativo": True,
                 "imagem_url": "/static/images/melhor.png"
             },
             {
                 "nome": "Ajude a pagar o Casamento",
                 "descricao": "",
-                "valor_total": 250.00,
+                "valor_total": 199.90,
                 "ativo": True,
                 "imagem_url": "/static/images/ajude.png"
             },
             {
                 "nome": "Pagar a paciência da noiva",
                 "descricao": "",
-                "valor_total": 80.00,
+                "valor_total": 79.90,
                 "ativo": True,
                 "imagem_url": "/static/images/paciencia.png"
             },
             {
                 "nome": "Deus tocou seu coração",
                 "descricao": "",
-                "valor_total": 100.00,
+                "valor_total": 119.90,
                 "ativo": True,
                 "imagem_url": "/static/images/sourica.png"
             },
             {
                 "nome": "Taxa para não jogar o buquê para o seu par",
                 "descricao": "",
-                "valor_total": 120.00,
+                "valor_total": 119.90,
                 "ativo": True,
                 "imagem_url": "/static/images/buque.png"
             }
