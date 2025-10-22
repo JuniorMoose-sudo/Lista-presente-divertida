@@ -175,30 +175,62 @@ class MercadoPagoService:
             return None
 
     def processar_webhook(self, data):
-        """Processa os webhooks enviados pelo Mercado Pago"""
+        """Processa os webhooks enviados pelo Mercado Pago (payment e merchant_order)"""
         try:
             print(f"📩 Webhook recebido: {data}")
+
             event_type = data.get("type")
-            if event_type != "payment":
-                print("⚠️ Webhook ignorado: não é do tipo 'payment'")
+            action = data.get("action")
+            resource_id = None
+
+            # --- Determina o tipo de evento ---
+            if event_type == "payment" or action and "payment" in action:
+                resource_id = data.get("data", {}).get("id")
+                if not resource_id:
+                    print("❌ Webhook sem ID de pagamento")
+                    return None
+
+                payment_info = self.sdk.payment().get(resource_id)
+                payment = payment_info.get("response", {})
+                print(f"💳 Pagamento consultado: {payment}")
+
+                metadata = payment.get("metadata", {})
+                contribuicao_id = metadata.get("contribuicao_id")
+
+                return {
+                    "contribuicao_id": contribuicao_id,
+                    "status": payment.get("status")
+                }
+
+            elif event_type == "merchant_order" or action and "merchant_order" in action:
+                resource_id = data.get("data", {}).get("id")
+                if not resource_id:
+                    print("❌ Webhook sem ID de merchant_order")
+                    return None
+
+                order_info = self.sdk.merchant_order().get(resource_id)
+                order = order_info.get("response", {})
+                print(f"📦 Merchant Order consultada: {order}")
+
+                # Pega o primeiro pagamento da ordem, se houver
+                payments = order.get("payments", [])
+                if not payments:
+                    print("⚠ Nenhum pagamento encontrado na ordem")
+                    return None
+
+                payment_id = payments[0].get("id")
+                payment_info = self.sdk.payment().get(payment_id)
+                payment = payment_info.get("response", {})
+                metadata = payment.get("metadata", {})
+
+                return {
+                    "contribuicao_id": metadata.get("contribuicao_id"),
+                    "status": payment.get("status")
+                }
+
+            else:
+                print("⚠ Tipo de webhook desconhecido ou não suportado")
                 return None
-
-            payment_id = data.get("data", {}).get("id")
-            if not payment_id:
-                print("❌ Webhook sem ID de pagamento")
-                return None
-
-            payment_info = self.sdk.payment().get(payment_id)
-            payment = payment_info.get("response", {})
-            print(f"💳 Pagamento consultado: {payment}")
-
-            metadata = payment.get("metadata", {})
-            contribuicao_id = metadata.get("contribuicao_id")
-
-            return {
-                "contribuicao_id": contribuicao_id,
-                "status": payment.get("status")
-            }
 
         except Exception as e:
             print(f"💥 Erro ao processar webhook: {e}")
