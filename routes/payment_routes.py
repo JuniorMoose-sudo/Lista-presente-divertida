@@ -194,6 +194,15 @@ def criar_contribuicao():
                 'contribuicao_id': contribuicao.id,
                 'metodo': 'cartao'
             })
+    except Exception as e:
+        db.session.rollback()
+        print(f"💥 Erro geral: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 @payment_bp.route('/obrigado')
 def obrigado():
