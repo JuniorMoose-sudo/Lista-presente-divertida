@@ -64,15 +64,17 @@ def create_app():
 
 app = create_app()
 
-# Inicialização automática no Render
+# Inicializa/atualiza os presentes automaticamente
 if os.environ.get('RENDER'):
-    print("🚀 Inicializando no ambiente Render...")
-    with app.app_context():
-        try:
-            from init_db import init_sample_data
+    print("🚀 Inicializando no ambiente Render e atualizando presentes...")
+    try:
+        from init_db import init_sample_data
+        with app.app_context():
             init_sample_data()
-        except Exception as e:
-            print(f"❌ Erro na inicialização: {e}")
+    except Exception as e:
+        print(f"❌ Erro na inicialização: {e}")
+else:
+    print("💻 Inicializando localmente...")
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
