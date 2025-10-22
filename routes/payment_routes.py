@@ -131,11 +131,19 @@ def criar_contribuicao():
                 'error': 'Valor deve ser maior que zero'
             }), 400
 
+        # --- Prepara dados pessoais ---
+        cpf_raw = data.get('cpf', '')
+        if isinstance(cpf_raw, str):
+            cpf_raw = cpf_raw.replace('.', '').replace('-', '').strip()
+        telefone_raw = data.get('telefone', '')
+
         # --- Cria a contribuição ---
         contribuicao = Contribuicao(
             presente_id=presente.id,
             nome_contribuinte=data['nome'],
             email_contribuinte=data['email'],
+            cpf_contribuinte=cpf_raw,
+            telefone_contribuinte=telefone_raw,
             valor=valor_contribuicao,
             mensagem=data.get('mensagem', ''),
             status='pendente',

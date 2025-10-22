@@ -18,7 +18,7 @@ $payloadComCpf = @{
     email = 'teste+cpf@example.com'
     cpf = '123.456.789-09'
     telefone = '(11) 99999-9999'
-    valor = 5.00
+    valor = 2.00
     mensagem = 'Teste com CPF'
     metodo_pagamento = 'cartao'
 }
@@ -30,7 +30,7 @@ $payloadSemCpf = @{
     email = 'teste+semcpf@example.com'
     # cpf ausente
     telefone = '(11) 98888-8888'
-    valor = 5.00
+    valor = 2.00
     mensagem = 'Teste sem CPF'
     metodo_pagamento = 'cartao'
 }
