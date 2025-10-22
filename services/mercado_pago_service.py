@@ -212,13 +212,29 @@ class MercadoPagoService:
                 order = order_info.get("response", {})
                 print(f"📦 Merchant Order consultada: {order}")
 
-                # Pega o primeiro pagamento da ordem, se houver
+                # Pega pagamentos da ordem e tenta escolher o melhor pagamento
                 payments = order.get("payments", [])
                 if not payments:
                     print("⚠ Nenhum pagamento encontrado na ordem")
                     return None
 
-                payment_id = payments[0].get("id")
+                # Prioriza um pagamento 'approved', depois 'in_process'/'pending', senão pega o último
+                preferred_payment = None
+                for p in payments:
+                    if p.get('status') == 'approved':
+                        preferred_payment = p
+                        break
+
+                if not preferred_payment:
+                    for p in payments:
+                        if p.get('status') in ('in_process', 'pending'):
+                            preferred_payment = p
+                            break
+
+                if not preferred_payment:
+                    preferred_payment = payments[-1]
+
+                payment_id = preferred_payment.get('id')
                 payment_info = self.sdk.payment().get(payment_id)
                 payment = payment_info.get("response", {})
                 metadata = payment.get("metadata", {})

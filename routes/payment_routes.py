@@ -106,23 +106,31 @@ def criar_contribuicao():
                 'success': False,
                 'error': erro
             }), 400
-        
+
         presente = Presente.query.get(data['presente_id'])
         if not presente:
             return jsonify({
                 'success': False,
                 'error': 'Presente não encontrado'
             }), 404
-        
-        valor_contribuicao = float(data['valor'])
-        
+
+        try:
+            # Trata valor com vírgula ou ponto
+            valor_str = str(data['valor']).replace(',', '.')
+            valor_contribuicao = float(valor_str)
+        except (ValueError, TypeError):
+            return jsonify({
+                'success': False,
+                'error': 'Valor inválido'
+            }), 400
+
         # Verifica se o valor é válido
         if valor_contribuicao <= 0:
             return jsonify({
                 'success': False,
                 'error': 'Valor deve ser maior que zero'
             }), 400
-        
+
         # --- Cria a contribuição ---
         contribuicao = Contribuicao(
             presente_id=presente.id,
@@ -133,28 +141,26 @@ def criar_contribuicao():
             status='pendente',
             metodo_pagamento=data.get('metodo_pagamento', 'cartao')
         )
-        
+
         db.session.add(contribuicao)
-        db.session.commit()
-        
+        db.session.flush()  # Gera o ID mas não commita ainda
+
         print(f"✅ Contribuição criada: {contribuicao.id} - Método: {contribuicao.metodo_pagamento}")
-        
+
         # --- PROCESSAMENTO PIX ---
         if data.get('metodo_pagamento') == 'pix':
             print("🎯 Processando PIX...")
-            
             # Para PIX, marcamos como aprovado automaticamente
             contribuicao.status = 'aprovado'
-            presente.valor_arrecadado += valor_contribuicao
+            presente.valor_arrecadado = float(presente.valor_arrecadado or 0) + valor_contribuicao
             db.session.commit()
-            
             return jsonify({
                 'success': True,
                 'metodo': 'pix',
                 'contribuicao_id': contribuicao.id,
                 'message': 'Contribuição registrada com sucesso!'
             })
-        
+
         # --- PROCESSAMENTO MERCADO PAGO (CARTÃO) ---
         else:
             print("🎯 Processando Mercado Pago...")
@@ -188,105 +194,6 @@ def criar_contribuicao():
                 'contribuicao_id': contribuicao.id,
                 'metodo': 'cartao'
             })
-        
-    except Exception as e:
-        db.session.rollback()
-        print(f"💥 Erro geral: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-@payment_bp.route('/webhook/mercadopago', methods=['POST'])
-@with_retry(max_retries=3, delay=2)  # Retry com backoff exponencial
-def webhook_mercadopago():
-    """Webhook para produção - com validações e retry"""
-    try:
-        logger.info("webhook_received", source="mercadopago")
-        
-        # Validação de assinatura
-        signature = request.headers.get('X-Hub-Signature')
-        if signature:
-            data = request.get_data(as_text=True)
-            if not verify_webhook_signature(data, signature):
-                logger.error("webhook_invalid_signature")
-                return jsonify({'success': False, 'error': 'Invalid signature'}), 401
-        
-        data = request.get_json()
-        if not data:
-            logger.error("webhook_no_data")
-            return jsonify({'success': False, 'error': 'No data'}), 400
-        
-        # Processa o webhook com retry
-        mp_service = MercadoPagoService()
-        resultado = mp_service.processar_webhook(data)
-        
-        if not resultado:
-            logger.error("webhook_processing_failed")
-            return jsonify({'success': False, 'error': 'Failed to process webhook'}), 422
-            
-        contribuicao = Contribuicao.query.get(resultado['contribuicao_id'])
-        if not contribuicao:
-            logger.error(
-                "webhook_contribuicao_not_found",
-                contribuicao_id=resultado.get('contribuicao_id')
-            )
-            return jsonify({'success': False, 'error': 'Contribution not found'}), 404
-        
-        status_mp = resultado['status']
-        logger.info(
-            "webhook_updating_status",
-            contribuicao_id=contribuicao.id,
-            old_status=contribuicao.status,
-            new_status=status_mp
-        )
-        
-        # Processamento dos diferentes status
-        if status_mp == 'approved':
-            contribuicao.status = 'aprovado'
-            presente = contribuicao.presente
-            valor_anterior = float(presente.valor_arrecadado)
-            presente.valor_arrecadado += float(contribuicao.valor)
-            
-            logger.info(
-                "payment_approved",
-                contribuicao_id=contribuicao.id,
-                valor=float(contribuicao.valor),
-                presente_id=presente.id,
-                valor_anterior=valor_anterior,
-                valor_atual=float(presente.valor_arrecadado)
-            )
-        elif status_mp in ['cancelled', 'rejected']:
-            contribuicao.status = 'cancelado'
-            logger.info(
-                "payment_cancelled",
-                contribuicao_id=contribuicao.id,
-                reason=status_mp
-            )
-        elif status_mp == 'in_process':
-            contribuicao.status = 'pendente'
-            logger.info(
-                "payment_pending",
-                contribuicao_id=contribuicao.id
-            )
-        elif status_mp == 'refunded':
-            contribuicao.status = 'reembolsado'
-            logger.info(
-                "payment_refunded",
-                contribuicao_id=contribuicao.id
-            )
-            print(f"↩️ Pagamento reembolsado")
-        
-        db.session.commit()
-        print(f"✅ Webhook processado com sucesso")
-        return jsonify({'success': True})
-    except Exception as e:
-        print(f"💥 Erro no webhook: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'success': False}), 500
 
 @payment_bp.route('/obrigado')
 def obrigado():
