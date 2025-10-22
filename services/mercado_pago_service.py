@@ -107,12 +107,21 @@ class MercadoPagoService:
             preference_data = {
                 "items": [
                     {
+                        # Campos recomendados pelo Mercado Pago para melhorar índice de aprovação
+                        # - id: código interno do item (aqui usamos o ID do presente)
+                        # - category_id: categoria do item (ajuste conforme necessário)
+                        # - description: descrição detalhada do item
+                        "id": str(presente.id),
                         "title": f"Contribuição: {presente.nome}",
+                        "description": presente.descricao or "Contribuição para presente",
+                        "category_id": "wedding_gift",
                         "quantity": 1,
                         "currency_id": "BRL",
                         "unit_price": float(contribuicao.valor)
                     }
                 ],
+                # External reference permite correlacionar preferência/payment_id com o ID interno
+                "external_reference": str(contribuicao.id),
                 "payer": {
                     "name": contribuicao.nome_contribuinte,
                     "email": contribuicao.email_contribuinte,
