@@ -59,22 +59,19 @@ class MercadoPagoService:
         try:
             # Validações de segurança adicionais
             if contribuicao.status != 'pendente':
-                logger.error("invalid_contribution_status",
-                           contribuicao_id=contribuicao.id,
-                           status=contribuicao.status)
+                logger.error("invalid_contribution_status: contribuicao_id=%s status=%s",
+                           contribuicao.id, contribuicao.status)
                 raise ValueError("Contribuição em estado inválido")
 
             # Verifica novamente o presente
             if presente.esta_completo:
-                logger.error("present_already_complete",
-                           presente_id=presente.id)
+                logger.error("present_already_complete: presente_id=%s", presente.id)
                 raise ValueError("Presente já completamente pago")
 
             # Verifica valor novamente
             valor_atual = float(contribuicao.valor)
             if valor_atual <= 0 or valor_atual > 10000:
-                logger.error("invalid_amount",
-                           valor=valor_atual)
+                logger.error("invalid_amount: valor=%s", valor_atual)
                 raise ValueError("Valor inválido para pagamento")
 
             valor_formatado = f"{valor_atual:.2f}"
@@ -82,12 +79,13 @@ class MercadoPagoService:
 
             # Valida e limpa CPF e telefone
             try:
-                cpf_limpo = self._validar_cpf(contribuicao.cpf_contribuinte)
+                # Normaliza/limpa CPF antes de validar (remove pontos e traços)
+                cpf_raw = contribuicao.cpf_contribuinte or ''
+                cpf_raw = str(cpf_raw).replace('.', '').replace('-', '').strip()
+                cpf_limpo = self._validar_cpf(cpf_raw)
                 telefone_limpo = self._limpar_telefone(contribuicao.telefone_contribuinte)
             except ValueError as e:
-                logger.error("validation_error",
-                           error=str(e),
-                           contribuicao_id=contribuicao.id)
+                logger.error("validation_error: %s | contribuicao_id=%s", str(e), contribuicao.id)
                 raise ValueError(f"Dados inválidos: {str(e)}")
 
             print(f"🎯 Criando preferência PRODUÇÃO para R$ {valor_formatado} - {nome_comprador}")
@@ -155,7 +153,7 @@ class MercadoPagoService:
             if not init_point:
                 msg = response.get('message') or response
                 print(f"❌ Erro Mercado Pago: {msg}")
-                logger.error("mp_preference_missing_init_point", response=response)
+                logger.error("mp_preference_missing_init_point: %s", response)
                 return None
 
             # Normalize response to always include init_point key
