@@ -1,6 +1,9 @@
 import os
+import logging
 import mercadopago
 from config import Config
+
+logger = logging.getLogger(__name__)
 
 class MercadoPagoService:
     def __init__(self):
@@ -137,12 +140,24 @@ class MercadoPagoService:
 
             print(f"🎯 Response Mercado Pago: {response}")
 
-            if "init_point" not in response:
-                print(f"❌ Erro Mercado Pago: {response.get('message', 'Erro desconhecido')}")
+            # Prefer init_point, mas aceita sandbox_init_point como fallback para debugging/local
+            init_point = response.get('init_point') or response.get('sandbox_init_point')
+
+            if not init_point:
+                msg = response.get('message') or response
+                print(f"❌ Erro Mercado Pago: {msg}")
+                logger.error("mp_preference_missing_init_point", response=response)
                 return None
 
-            print(f"✅ Link de pagamento gerado: {response['init_point']}")
-            return response
+            # Normalize response to always include init_point key
+            response['init_point'] = init_point
+
+            print(f"✅ Link de pagamento gerado: {init_point}")
+            return {
+                'id': response.get('id'),
+                'init_point': init_point,
+                'raw': response
+            }
 
         except Exception as e:
             print(f"❌ Erro ao gerar preferência de pagamento: {e}")

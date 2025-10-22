@@ -161,24 +161,27 @@ def criar_contribuicao():
             mp_service = MercadoPagoService()
             base_url = request.host_url.rstrip('/')
             preference = mp_service.criar_preferencia_pagamento(contribuicao, presente, base_url)
-            
-            if not preference or "init_point" not in preference:
+
+            print(f"🎯 Preference response: {preference}")
+
+            if not preference or not preference.get('init_point'):
                 error_msg = "Erro ao gerar link de pagamento com Mercado Pago"
-                print(f"❌ {error_msg}")
-                
+                print(f"❌ {error_msg} - {preference}")
+
                 # Remove a contribuição se falhou
                 db.session.delete(contribuicao)
                 db.session.commit()
-                
+
                 return jsonify({
                     'success': False,
-                    'error': error_msg
+                    'error': error_msg,
+                    'raw': preference
                 }), 500
-            
+
             # Atualiza com ID do pagamento
-            contribuicao.payment_id = preference.get('id')
+            contribuicao.payment_id = preference.get('id') or (preference.get('raw') or {}).get('id')
             db.session.commit()
-            
+
             return jsonify({
                 'success': True,
                 'payment_url': preference['init_point'],

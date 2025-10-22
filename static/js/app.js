@@ -178,9 +178,19 @@ class WeddingGiftApp {
             const result = await response.json();
 
             if (result.success) {
-                this.hideLoading();
-                // Redireciona para Mercado Pago
-                window.location.href = result.payment_url;
+                    // Garantir que o loading foi escondido e modal fechado
+                    try { this.hideLoading(); } catch (e) { console.warn('hideLoading failed', e); }
+                    try { bootstrap.Modal.getInstance(document.getElementById('modalPagamento'))?.hide(); } catch (e) { /* ignore */ }
+
+                    console.log('Payment response (cartao):', result);
+                    if (!result.payment_url) {
+                        this.showError('Não foi possível gerar o link de pagamento. Tente novamente mais tarde.');
+                        return;
+                    }
+
+                    // Redireciona para Mercado Pago
+                    console.log('Redirecionando para:', result.payment_url);
+                    window.location.href = result.payment_url;
             } else {
                 throw new Error(result.error);
             }
