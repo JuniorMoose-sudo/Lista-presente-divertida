@@ -107,7 +107,7 @@
 }
 
 /* 💬 Status de presente já comprado */
-/*.gift-completed {
+.gift-completed {
   opacity: 0.8;
   background: linear-gradient(135deg, #e9ecef, #dee2e6);
 }
@@ -115,10 +115,10 @@
 .gift-completed .card-title {
   text-decoration: line-through;
   color: var(--text-light);
-}*/
+}
 
 /* Barra de progresso */
-/*.progress {
+.progress {
   height: 8px;
   border-radius: 4px;
   background-color: #f1f3f5;
