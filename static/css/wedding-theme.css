@@ -1,4 +1,4 @@
-/* 🎨 Paleta azul moderna */
+/* Paleta azul moderna */
 :root {
   --primary-color: #007bff;
   --secondary-color: #00b4d8;
@@ -8,7 +8,7 @@
   --background-light: #f8f9fa;
 }
 
-/* 🎉 Cabeçalho */
+/* Cabeçalho */
 .wedding-header {
   background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
   position: relative;
@@ -26,7 +26,7 @@
   z-index: 0;
 }
 
-/* 🔹 Título da seção */
+/* Título da seção */
 .section-title {
   color: var(--text-dark);
   font-weight: 400;
@@ -47,7 +47,7 @@
   border-radius: 2px;
 }
 
-/* 💎 Cards de presente */
+/* Cards de presente */
 .gift-card {
   border: none;
   border-radius: 16px;
@@ -63,7 +63,7 @@
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
 }
 
-/* 🖼️ Imagem do presente */
+/* Imagem do presente */
 .gift-card .card-img-top,
 .gift-image {
   width: 100%;
@@ -75,7 +75,7 @@
   padding: 10px;
 }
 
-/* 📝 Título e preço */
+/* Título e preço */
 .card-title {
   font-weight: 500;
   color: var(--text-dark);
@@ -90,7 +90,7 @@
   font-size: 1.1rem;
 }
 
-/* 🩵 Botão de presentear */
+/* Botão de presentear */
 .btn-presentear {
   background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
   border: none;
@@ -107,7 +107,7 @@
 }
 
 /* 💬 Status de presente já comprado */
-.gift-completed {
+/*.gift-completed {
   opacity: 0.8;
   background: linear-gradient(135deg, #e9ecef, #dee2e6);
 }
@@ -115,10 +115,10 @@
 .gift-completed .card-title {
   text-decoration: line-through;
   color: var(--text-light);
-}
+}*/
 
-/* 📊 Barra de progresso */
-.progress {
+/* Barra de progresso */
+/*.progress {
   height: 8px;
   border-radius: 4px;
   background-color: #f1f3f5;
@@ -128,9 +128,9 @@
   background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
   border-radius: 4px;
   transition: width 0.5s ease;
-}
+}*/
 
-/* ⚡ Animação de entrada */
+/* Animação de entrada */
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(25px); }
   to { opacity: 1; transform: translateY(0); }
@@ -140,7 +140,7 @@
   animation: fadeInUp 0.6s ease forwards;
 }
 
-/* 📱 Responsividade */
+/* Responsividade */
 @media (max-width: 768px) {
   .wedding-header {
     padding: 2.5rem 1rem;
