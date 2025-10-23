@@ -1,6 +1,7 @@
 import os
 import logging
 import requests
+import re
 from flask import Blueprint, request, jsonify
 from database import db
 from models.contribuicao import Contribuicao
@@ -11,6 +12,11 @@ ACCESS_TOKEN = os.getenv("MERCADOPAGO_ACCESS_TOKEN")
 
 logger = logging.getLogger("routes.webhook")
 logger.setLevel(logging.INFO)
+
+def extract_order_id(resource_url):
+    """Extrai o ID da ordem a partir da URL completa"""
+    match = re.search(r'/merchant_orders/(\d+)', resource_url)
+    return match.group(1) if match else resource_url
 
 @webhook_bp.route("/mercadopago", methods=["POST"])
 def mercadopago_webhook():
@@ -32,7 +38,8 @@ def mercadopago_webhook():
 
         # Se for notificação de pedido (merchant_order)
         elif topic == "merchant_order":
-            return handle_merchant_order(resource)
+            order_id = extract_order_id(resource)
+            return handle_merchant_order(order_id)
 
         else:
             logger.warning("⚠ Tipo de webhook desconhecido ou não suportado")
