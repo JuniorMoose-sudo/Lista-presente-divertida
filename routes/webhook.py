@@ -1,119 +1,112 @@
-from flask import Blueprint, request, jsonify
+import os
 import logging
-import hmac
-import hashlib
-from config import Config
-from services.mercado_pago_service import MercadoPagoService
-from models.contribuicao import Contribuicao
+import requests
+from flask import Blueprint, request, jsonify
 from database import db
+from models.contribuicao import Contribuicao
 
-logger = logging.getLogger(__name__)
+webhook_bp = Blueprint("webhook", __name__, url_prefix="/webhook")
 
-webhook_bp = Blueprint("webhook", __name__)
+ACCESS_TOKEN = os.getenv("MERCADOPAGO_ACCESS_TOKEN")
 
+logger = logging.getLogger("routes.webhook")
+logger.setLevel(logging.INFO)
 
-def verify_webhook_signature(data_text, signature_header):
-    """Verifica assinatura HMAC (quando Config.MERCADOPAGO_WEBHOOK_SECRET está configurada).
-
-    Aceita header no formato 't=timestamp,v1=hash' ou apenas o hash.
-    """
-    secret = getattr(Config, 'MERCADOPAGO_WEBHOOK_SECRET', None)
-    if not secret:
-        # Não configurado: aceita por compatibilidade (mas loga)
-        logger.warning("MERCADOPAGO_WEBHOOK_SECRET não configurado; pulando verificação de assinatura")
-        return True
-
-    if not signature_header:
-        logger.warning("Webhook sem assinatura — aceitando requisição (modo compatível com MP)")
-        return True  # ✅ Agora aceita mesmo sem header
-
-    # Extrai v1 se presente
-    if 'v1=' in signature_header:
-        signature_value = signature_header.split('v1=')[-1]
-    else:
-        signature_value = signature_header
-
-    calculated = hmac.new(
-        secret.encode(),
-        data_text.encode(),
-        hashlib.sha256
-    ).hexdigest()
-
-    is_valid = hmac.compare_digest(calculated, signature_value)
-    if not is_valid:
-        logger.warning("Assinatura do webhook não confere, mas aceitando por compatibilidade")
-        return True  # ✅ Não bloqueia — apenas alerta
-
-    return True
-
-
-@webhook_bp.route("/webhook/mercadopago", methods=["POST"])
+@webhook_bp.route("/mercadopago", methods=["POST"])
 def mercadopago_webhook():
-    # Lê o payload cru (necessário para verificar assinatura HMAC)
-    raw_text = request.get_data(as_text=True)
-
-    # Verificação de assinatura (padrão: X-Signature ou X-Request-Id)
-    signature_header = request.headers.get('X-Signature') or request.headers.get('X-Request-Id')
-    if not verify_webhook_signature(raw_text, signature_header):
-        logger.error("Assinatura do webhook inválida — rejeitando requisição")
-        return jsonify({"error": "Invalid signature"}), 401
-
-    # Parse JSON
     try:
-        data = request.get_json()
-    except Exception:
-        logger.error("Payload inválido")
-        return jsonify({"error": "Invalid payload"}), 400
+        data = request.get_json(force=True)
+        logger.info(f"📩 Webhook recebido: {data}")
 
-    try:
-        mp_service = MercadoPagoService()
-        resultado = mp_service.processar_webhook(data)
+        # Verifica tipo do evento
+        topic = data.get("topic") or request.args.get("topic")
+        resource = data.get("resource") or request.args.get("id")
 
-        if not resultado:
-            logger.info("Webhook ignorado ou sem resultado útil")
-            return jsonify({"info": "Ignored or no data"}), 200
+        if not topic or not resource:
+            logger.warning("❌ Webhook sem topic ou resource")
+            return jsonify({"status": "ignored"}), 200
 
-        contribuicao_id = resultado.get('contribuicao_id')
-        status = resultado.get('status')
+        # Se for notificação de pagamento
+        if topic == "payment":
+            return handle_payment(resource)
 
-        if not contribuicao_id:
-            logger.warning("Webhook sem contribuicao_id no metadata")
-            return jsonify({"error": "Missing contribuicao_id"}), 400
+        # Se for notificação de pedido (merchant_order)
+        elif topic == "merchant_order":
+            return handle_merchant_order(resource)
 
-        # Atualiza DB conforme o resultado
-        contribuicao = Contribuicao.query.get(contribuicao_id)
-        if not contribuicao:
-            logger.warning(f"Contribuição {contribuicao_id} não encontrada")
-            return jsonify({"error": "Contribuição não encontrada"}), 404
-
-        # Mapeia status do MP para status interno
-        local_status = status
-        if status == 'approved':
-            local_status = 'aprovado'
-        elif status in ['in_process', 'pending']:
-            local_status = 'pendente'
-        elif status in ['cancelled', 'rejected']:
-            local_status = 'cancelado'
-        elif status == 'refunded':
-            local_status = 'reembolsado'
-
-        contribuicao.status = local_status
-
-        # Atualiza presente quando necessário
-        try:
-            presente = contribuicao.presente
-            if local_status == 'aprovado':
-                presente.valor_arrecadado = float(presente.valor_arrecadado or 0) + float(contribuicao.valor)
-            elif local_status == 'reembolsado':
-                presente.valor_arrecadado = float(presente.valor_arrecadado or 0) - float(contribuicao.valor)
-        except Exception:
-            logger.warning(f"Falha ao ajustar valores do presente para contribuicao={contribuicao_id}")
-
-        db.session.commit()
-        logger.info(f"Contribuição {contribuicao_id} atualizada para {local_status}")
-
-        return jsonify({"contribuicao_id": contribuicao_id, "status": status}), 200
+        else:
+            logger.warning("⚠ Tipo de webhook desconhecido ou não suportado")
+            return jsonify({"status": "ignored"}), 200
 
     except Exception as e:
-        logger.error(f"Erro ao processar webhook: {e}", exc_info=True)
-        return jsonify({"error": "Erro interno"}), 500
+        logger.error(f"❌ Erro ao processar webhook: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+
+def handle_payment(payment_id):
+    """Busca informações de pagamento e atualiza contribuição"""
+    try:
+        headers = {"Authorization": f"Bearer {ACCESS_TOKEN}"}
+        url = f"https://api.mercadopago.com/v1/payments/{payment_id}"
+        r = requests.get(url, headers=headers)
+
+        if r.status_code != 200:
+            logger.warning(f"⚠ Falha ao buscar pagamento {payment_id}: {r.text}")
+            return jsonify({"status": "payment_not_found"}), 200
+
+        payment_info = r.json()
+        logger.info(f"💰 Pagamento recebido: {payment_info}")
+
+        contrib_id = payment_info.get("metadata", {}).get("contribuicao_id")
+        status = payment_info.get("status")
+
+        if not contrib_id:
+            logger.warning("⚠ Pagamento sem contrib_id nos metadados")
+            return jsonify({"status": "ignored"}), 200
+
+        contribuicao = Contribuicao.query.get(contrib_id)
+        if not contribuicao:
+            logger.warning(f"⚠ Contribuição {contrib_id} não encontrada")
+            return jsonify({"status": "ignored"}), 200
+
+        # Atualiza status conforme o Mercado Pago
+        contribuicao.status_pagamento = status
+        db.session.commit()
+
+        logger.info(f"✅ Contribuição {contrib_id} atualizada para '{status}'")
+        return jsonify({"status": "ok"}), 200
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao processar pagamento {payment_id}: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+
+def handle_merchant_order(order_id):
+    """Busca informações do pedido (merchant order)"""
+    try:
+        headers = {"Authorization": f"Bearer {ACCESS_TOKEN}"}
+        url = f"https://api.mercadolibre.com/merchant_orders/{order_id}"
+        r = requests.get(url, headers=headers)
+
+        if r.status_code != 200:
+            logger.warning(f"⚠ Falha ao buscar merchant_order {order_id}: {r.text}")
+            return jsonify({"status": "merchant_order_not_found"}), 200
+
+        order_info = r.json()
+        logger.info(f"📦 Merchant order recebida: {order_info}")
+
+        payments = order_info.get("payments", [])
+        if not payments:
+            logger.info("ℹ Nenhum pagamento ainda associado à ordem.")
+            return jsonify({"status": "pending"}), 200
+
+        # Pega o primeiro pagamento vinculado
+        payment_id = payments[0].get("id")
+        if payment_id:
+            return handle_payment(payment_id)
+
+        return jsonify({"status": "no_payment_found"}), 200
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao processar merchant_order {order_id}: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
