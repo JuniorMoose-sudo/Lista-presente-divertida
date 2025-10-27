@@ -39,10 +39,20 @@ def mercadopago_webhook():
             logger.warning("❌ Webhook sem topic/type ou id")
             return jsonify({"status": "ignored"}), 200
 
+<<<<<<< HEAD
         if "payment" in topic:
             return handle_payment(payment_id)
         elif "merchant_order" in topic:
             order_id = extract_order_id(payment_id)
+=======
+        # Se for notificação de pagamento
+        if topic == "payment":
+            return handle_payment(resource)
+
+        # Se for notificação de pedido (merchant_order)
+        elif topic == "merchant_order":
+            order_id = extract_order_id(resource)
+>>>>>>> 4f6147b19ab583a820a177f5700ab4a39c8f9e95
             return handle_merchant_order(order_id)
 
         else:

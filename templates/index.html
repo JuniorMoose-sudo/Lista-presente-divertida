@@ -26,7 +26,7 @@
                             <span class="h4 text-primary">R$ {{ "%.2f"|format(presente.valor_total) }}</span>
                         </div>
 
-                        {% if presente.valor_arrecadado > 0 %}
+                        <!--{% if presente.valor_arrecadado > 0 %}
                         <div class="progress mb-2" style="height: 6px;">
                             <div class="progress-bar" 
                                  role="progressbar" 
@@ -40,7 +40,7 @@
                             R$ {{ "%.2f"|format(presente.valor_arrecadado) }} arrecadado
                         </small>
                         {% endif %}
-                    </div>
+                    </div> -->
                     
                     <div class="card-footer bg-transparent border-0 pb-3">
                         <button class="btn btn-primary w-100 btn-presentear" 
@@ -95,7 +95,7 @@
                         <label for="valor" class="form-label">Valor do Presente (R$) *</label>
                         <input type="number" class="form-control" id="valor" name="valor" 
                                min="1" step="0.01" required>
-                        <div class="form-text">Valor sugerido: R$ <span id="valor-sugerido">0.00</span></div>
+                        <!--<div class="form-text">Valor sugerido: R$ <span id="valor-sugerido">0.00</span></div>-->
                     </div>
                     
                     <div class="mb-3">
@@ -328,8 +328,8 @@ class WeddingGiftApp {
             presente_nome: document.getElementById('modal-presente-nome').textContent,
             nome: formData.get('nome'),
             email: formData.get('email'),
-            cpf: formData.get('cpf'),           // ✅ NOVO
-            telefone: formData.get('telefone'), // ✅ NOVO
+            cpf: formData.get('cpf'),           
+            telefone: formData.get('telefone'), 
             valor: parseFloat(formData.get('valor')),
             mensagem: formData.get('mensagem'),
             metodo_pagamento: 'cartao'
