@@ -32,7 +32,11 @@ def extract_order_id(resource_url):
 def mercadopago_webhook():
     try:
         raw_data = request.data.decode('utf-8')
-        signature = request.headers.get('X-Hub-Signature-256', '')
+        signature = request.headers.get('X-Hub-Signature', '')
+        
+        # Extract the hexdigest if the signature is in the format "sha256=hexdigest"
+        if signature.startswith('sha256='):
+            signature = signature[7:]  # Remove "sha256=" prefix
 
         if not verify_webhook_signature(raw_data, signature):
             logger.warning(f"⚠ Assinatura inválida no webhook. Dados recebidos: {raw_data}")
