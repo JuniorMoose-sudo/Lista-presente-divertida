@@ -32,18 +32,27 @@ def extract_order_id(resource_url):
 def mercadopago_webhook():
     try:
         raw_data = request.data.decode('utf-8')
-        signature = request.headers.get('X-Hub-Signature', '')
         
-        # Extract the hexdigest if the signature is in the format "sha256=hexdigest"
-        if signature.startswith('sha256='):
-            signature = signature[7:]  # Remove "sha256=" prefix
-
-        if not verify_webhook_signature(raw_data, signature):
-            logger.warning(f"⚠ Assinatura inválida no webhook. Dados recebidos: {raw_data}")
-            return jsonify({"status": "invalid signature"}), 403
-
+        # Parse JSON data once and reuse it
         data = request.get_json(force=True)
-        logger.info(f"📩 Webhook recebido: {data}")
+        topic = data.get("topic") or request.args.get("topic")
+        
+        # Bypass signature validation for merchant_order webhooks
+        if topic == "merchant_order":
+            logger.info(f"📦 MERCHANT ORDER webhook recebido: {data}")
+        else:
+            # For other webhook types, validate the signature
+            signature = request.headers.get('X-Hub-Signature', '')
+            
+            # Extract the hexdigest if the signature is in the format "sha256=hexdigest"
+            if signature.startswith('sha256='):
+                signature = signature[7:]  # Remove "sha256=" prefix
+
+            if not verify_webhook_signature(raw_data, signature):
+                logger.warning(f"⚠ Assinatura inválida no webhook. Dados recebidos: {raw_data}")
+                return jsonify({"status": "invalid signature"}), 403
+            
+            logger.info(f"💳 PAYMENT webhook recebido: {data}")
 
         # Suporte completo aos formatos antigo e novo do Mercado Pago
         payment_id = None
