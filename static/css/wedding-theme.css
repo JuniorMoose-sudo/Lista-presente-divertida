@@ -1,33 +1,41 @@
+/* 🎨 Paleta principal (azul suave e elegante) */
 :root {
-    --primary-color: #ff6b6b;
-    --secondary-color: #4ecdc4;
-    --accent-color: #ffd166;
-    --text-dark: #2d3436;
-    --text-light: #636e72;
-    --background-light: #f8f9fa;
+    --primary-color: #1e90ff;      /* Azul principal */
+    --secondary-color: #4ecdc4;    /* Azul esverdeado suave */
+    --accent-color: #ffd166;       /* Dourado claro para destaque */
+    --text-dark: #1a1a2e;
+    --text-light: #5c677d;
+    --background-light: #f8f9fb;
+    --neutral-gray: #e9ecef;
 }
 
+/* ==============================
+   🕊️ HEADER
+================================ */
 .wedding-header {
     background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
     position: relative;
     overflow: hidden;
+    color: white;
 }
 
 .wedding-header::before {
     content: '';
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%23ffffff' fill-opacity='0.1' fill-rule='evenodd'/%3E%3C/svg%3E");
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='10' cy='10' r='3' fill='%23ffffff' fill-opacity='0.1'/%3E%3C/svg%3E");
+    opacity: 0.5;
 }
 
+/* ==============================
+   ✨ SECTION TITLES
+================================ */
 .section-title {
     color: var(--text-dark);
     font-weight: 300;
     margin-bottom: 1rem;
     position: relative;
+    text-align: center;
 }
 
 .section-title::after {
@@ -36,43 +44,49 @@
     bottom: -10px;
     left: 50%;
     transform: translateX(-50%);
-    width: 50px;
-    height: 2px;
+    width: 60px;
+    height: 3px;
+    border-radius: 3px;
     background: var(--primary-color);
 }
 
+/* ==============================
+   🎁 GIFT CARDS
+================================ */
 .gift-card {
     border: none;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    transition: all 0.3s ease;
     border-radius: 15px;
+    background: white;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
     overflow: hidden;
+    animation: fadeInUp 0.6s ease forwards;
 }
 
 .gift-card:hover {
-    transform: translateY(-5px);
+    transform: translateY(-5px) scale(1.02);
     box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
 }
 
+/* Imagem dos presentes */
 .gift-card .card-img-top,
 .gift-image {
-    height: 200px;
-    object-fit: contain; /* ⬅️ Esta é a propriedade mais importante */
-    background-color: var(--background-light);
+    height: 220px;
     width: 100%;
-    padding: 10px; /* Espaço ao redor da imagem */
+    object-fit: cover;
+    background-color: var(--background-light);
     border-radius: 15px 15px 0 0;
+    transition: transform 0.3s ease;
 }
 
-.gift-card:hover .card-img-top,
 .gift-card:hover .gift-image {
-    transform: scale(1.02); /* Efeito mais suave no hover */
-    object-fit: contain; /* Mantém o contain mesmo no hover */
+    transform: scale(1.04);
 }
 
+/* Presentes já comprados */
 .gift-completed {
-    opacity: 0.8;
-    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    opacity: 0.85;
+    background: linear-gradient(135deg, #f1f3f6, #e3e7ed);
 }
 
 .gift-completed .card-title {
@@ -80,10 +94,25 @@
     color: var(--text-light);
 }
 
+/* Preço e valores */
+.gift-price {
+    font-weight: bold;
+    color: var(--primary-color);
+}
+
+.gift-values {
+    font-size: 0.9rem;
+    color: var(--text-light);
+}
+
+/* ==============================
+   📊 PROGRESS BAR
+================================ */
 .progress {
     height: 8px;
     border-radius: 4px;
-    background-color: #e9ecef;
+    background-color: var(--neutral-gray);
+    overflow: hidden;
 }
 
 .progress-bar {
@@ -92,30 +121,37 @@
     transition: width 0.5s ease;
 }
 
-.gift-values {
-    font-size: 0.9rem;
-}
-
-.btn-primary {
+/* ==============================
+   🎯 BUTTONS
+================================ */
+.btn-primary,
+.btn-presentear {
     background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
     border: none;
     border-radius: 25px;
     padding: 10px 20px;
     font-weight: 500;
+    color: #fff;
     transition: all 0.3s ease;
 }
 
-.btn-primary:hover {
+.btn-primary:hover,
+.btn-presentear:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
+    box-shadow: 0 4px 15px rgba(30, 144, 255, 0.4);
 }
 
-.wedding-footer {
-    background: linear-gradient(135deg, var(--text-dark), #1a1a1a);
-    margin-top: 4rem;
+/* ==============================
+   💙 PIX INFO (Modal)
+================================ */
+#info-pix {
+    border-left: 4px solid var(--primary-color);
+    background: #f0f8ff;
 }
 
-/* Animações */
+/* ==============================
+   🦋 ANIMAÇÕES
+================================ */
 @keyframes fadeInUp {
     from {
         opacity: 0;
@@ -127,91 +163,36 @@
     }
 }
 
-.gift-card {
-    animation: fadeInUp 0.6s ease forwards;
-}
-
-.gift-card:nth-child(1) { animation-delay: 0.1s; }
-.gift-card:nth-child(2) { animation-delay: 0.2s; }
-.gift-card:nth-child(3) { animation-delay: 0.3s; }
-.gift-card:nth-child(4) { animation-delay: 0.4s; }
-.gift-card:nth-child(5) { animation-delay: 0.5s; }
-.gift-card:nth-child(6) { animation-delay: 0.6s; }
-
-/* Responsividade */
+/* ==============================
+   📱 RESPONSIVIDADE
+================================ */
 @media (max-width: 768px) {
     .wedding-header {
         padding: 3rem 0;
+        text-align: center;
     }
     
     .display-4 {
-        font-size: 2.5rem;
+        font-size: 2rem;
+    }
+
+    .gift-image {
+        height: 160px;
+    }
+
+    .btn-primary, .btn-presentear {
+        padding: 8px 16px;
+        font-size: 0.9rem;
     }
 }
 
-/* Novos estilos para cards compactos */
-.gift-card {
-    border: none;
-    border-radius: 15px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-    transition: all 0.3s ease;
-}
-
-.gift-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-}
-
-.gift-price {
-    font-weight: bold;
-}
-
-.btn-presentear {
-    background: linear-gradient(135deg, #ff6b6b, #4ecdc4);
-    border: none;
-    border-radius: 25px;
-    padding: 10px 20px;
-    font-weight: 500;
-}
-
-/* Modal PIX */
-#info-pix {
-    border-left: 4px solid #0d6efd;
-}
-
-/* Progress bar mais discreta */
-.progress {
-    background-color: #f8f9fa;
-}
-
-/* Estilos para imagens dos presentes */
-.gift-image {
-    height: 200px;
-    object-fit: cover;
-    border-radius: 15px 15px 0 0;
-}
-
-/* Cards compactos */
-.gift-card {
-    border: none;
-    border-radius: 15px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-    transition: all 0.3s ease;
-}
-
-.gift-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-}
-
-.gift-price {
-    font-weight: bold;
-}
-
-.btn-presentear {
-    background: linear-gradient(135deg, #ff6b6b, #4ecdc4);
-    border: none;
-    border-radius: 25px;
-    padding: 10px 20px;
-    font-weight: 500;
+/* ==============================
+   ⚫ FOOTER
+================================ */
+.wedding-footer {
+    background: linear-gradient(135deg, var(--text-dark), #111);
+    margin-top: 4rem;
+    color: white;
+    padding: 2rem 0;
+    text-align: center;
 }

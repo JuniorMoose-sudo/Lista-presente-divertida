@@ -177,17 +177,24 @@ class MercadoPagoService:
         try:
             print(f"📩 Webhook recebido: {data}")
 
-            event_type = data.get("type")
+            # Compatibilidade com o novo formato (a partir de 2023)
+            event_type = data.get("type") or data.get("topic")
             action = data.get("action")
             resource_id = None
 
-            # --- Determina o tipo de evento ---
-            if event_type == "payment" or action and "payment" in action:
-                resource_id = data.get("data", {}).get("id")
-                if not resource_id:
-                    print("❌ Webhook sem ID de pagamento")
-                    return None
+            # Extrai ID corretamente, independentemente do formato
+            if "data" in data and isinstance(data["data"], dict):
+                resource_id = data["data"].get("id") or data.get("id")
+            else:
+                resource_id = data.get("id") or data.get("resource")
 
+            if not resource_id:
+                print("❌ Webhook sem ID de recurso")
+                return None
+
+            # --- Determina o tipo de evento ---
+            if "payment" in (event_type or "") or "payment" in (action or ""):
+                print(f"💳 Recebido webhook de pagamento: {resource_id}")
                 payment_info = self.sdk.payment().get(resource_id)
                 payment = payment_info.get("response", {})
                 print(f"💳 Pagamento consultado: {payment}")
@@ -200,35 +207,21 @@ class MercadoPagoService:
                     "status": payment.get("status")
                 }
 
-            elif event_type == "merchant_order" or action and "merchant_order" in action:
-                resource_id = data.get("data", {}).get("id")
-                if not resource_id:
-                    print("❌ Webhook sem ID de merchant_order")
-                    return None
-
+            elif "merchant_order" in (event_type or "") or "merchant_order" in (action or ""):
+                print(f"📦 Recebido webhook de merchant_order: {resource_id}")
                 order_info = self.sdk.merchant_order().get(resource_id)
                 order = order_info.get("response", {})
                 print(f"📦 Merchant Order consultada: {order}")
 
-                # Pega pagamentos da ordem e tenta escolher o melhor pagamento
                 payments = order.get("payments", [])
                 if not payments:
                     print("⚠ Nenhum pagamento encontrado na ordem")
                     return None
 
-                # Prioriza um pagamento 'approved', depois 'in_process'/'pending', senão pega o último
-                preferred_payment = None
-                for p in payments:
-                    if p.get('status') == 'approved':
-                        preferred_payment = p
-                        break
-
+                # Escolhe o melhor pagamento
+                preferred_payment = next((p for p in payments if p.get('status') == 'approved'), None)
                 if not preferred_payment:
-                    for p in payments:
-                        if p.get('status') in ('in_process', 'pending'):
-                            preferred_payment = p
-                            break
-
+                    preferred_payment = next((p for p in payments if p.get('status') in ('in_process', 'pending')), None)
                 if not preferred_payment:
                     preferred_payment = payments[-1]
 
@@ -243,7 +236,7 @@ class MercadoPagoService:
                 }
 
             else:
-                print("⚠ Tipo de webhook desconhecido ou não suportado")
+                print(f"⚠ Tipo de evento desconhecido: {event_type} / {action}")
                 return None
 
         except Exception as e:

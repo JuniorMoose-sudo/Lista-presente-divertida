@@ -1,6 +1,7 @@
 import os
 import logging
 import requests
+import re
 from flask import Blueprint, request, jsonify
 from database import db
 from models.contribuicao import Contribuicao
@@ -12,27 +13,37 @@ ACCESS_TOKEN = os.getenv("MERCADOPAGO_ACCESS_TOKEN")
 logger = logging.getLogger("routes.webhook")
 logger.setLevel(logging.INFO)
 
+def extract_order_id(resource_url):
+    """Extrai o ID da ordem a partir da URL completa"""
+    match = re.search(r'/merchant_orders/(\d+)', resource_url)
+    return match.group(1) if match else resource_url
+
 @webhook_bp.route("/mercadopago", methods=["POST"])
 def mercadopago_webhook():
     try:
         data = request.get_json(force=True)
         logger.info(f"📩 Webhook recebido: {data}")
 
-        # Verifica tipo do evento
-        topic = data.get("topic") or request.args.get("topic")
-        resource = data.get("resource") or request.args.get("id")
+        # Suporte a novo formato do Mercado Pago
+        payment_id = None
+        topic = None
 
-        if not topic or not resource:
-            logger.warning("❌ Webhook sem topic ou resource")
+        if "type" in data and "data" in data:
+            topic = data["type"]
+            payment_id = data["data"].get("id")
+        else:
+            topic = data.get("topic") or request.args.get("topic")
+            payment_id = data.get("id") or request.args.get("id") or data.get("resource")
+
+        if not topic or not payment_id:
+            logger.warning("❌ Webhook sem topic/type ou id")
             return jsonify({"status": "ignored"}), 200
 
-        # Se for notificação de pagamento
-        if topic == "payment":
-            return handle_payment(resource)
-
-        # Se for notificação de pedido (merchant_order)
-        elif topic == "merchant_order":
-            return handle_merchant_order(resource)
+        if "payment" in topic:
+            return handle_payment(payment_id)
+        elif "merchant_order" in topic:
+            order_id = extract_order_id(payment_id)
+            return handle_merchant_order(order_id)
 
         else:
             logger.warning("⚠ Tipo de webhook desconhecido ou não suportado")
