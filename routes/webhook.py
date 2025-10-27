@@ -24,32 +24,39 @@ def mercadopago_webhook():
         data = request.get_json(force=True)
         logger.info(f"📩 Webhook recebido: {data}")
 
-        # Suporte a novo formato do Mercado Pago
+        # Suporte completo aos formatos antigo e novo do Mercado Pago
         payment_id = None
         topic = None
+        action = None
 
+        # Formato novo (2023+): {"type": "payment", "action": "payment.created", "data": {"id": "123"}}
         if "type" in data and "data" in data:
             topic = data["type"]
+            action = data.get("action")
             payment_id = data["data"].get("id")
+        
+        # Formato antigo: {"topic": "payment", "resource": "123"} ou parâmetros URL
         else:
             topic = data.get("topic") or request.args.get("topic")
-            payment_id = data.get("id") or request.args.get("id") or data.get("resource")
+            payment_id = data.get("resource") or request.args.get("id") or data.get("id")
 
         if not topic or not payment_id:
             logger.warning("❌ Webhook sem topic/type ou id")
             return jsonify({"status": "ignored"}), 200
 
-        # Se for notificação de pagamento
-        if "payment" in topic:
+        # Detecção melhorada de eventos de pagamento
+        # Formato antigo: topic="payment"
+        # Formato novo: type="payment" ou action="payment.created"
+        if "payment" in (topic or "") or "payment" in (action or ""):
             return handle_payment(payment_id)
         
-        # Se for notificação de pedido (merchant_order)
-        elif "merchant_order" in topic:
+        # Detecção de merchant_order
+        elif "merchant_order" in (topic or "") or "merchant_order" in (action or ""):
             order_id = extract_order_id(payment_id)
             return handle_merchant_order(order_id)
 
         else:
-            logger.warning("⚠ Tipo de webhook desconhecido ou não suportado")
+            logger.warning(f"⚠ Tipo de webhook desconhecido: topic={topic}, action={action}")
             return jsonify({"status": "ignored"}), 200
 
     except Exception as e:
