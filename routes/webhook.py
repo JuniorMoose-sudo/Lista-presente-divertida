@@ -27,7 +27,7 @@ logger.setLevel(logging.INFO)
 def verify_webhook_signature(data, signature):
     """Verifica a assinatura do webhook do Mercado Pago"""
     if not Config.MERCADOPAGO_WEBHOOK_SECRET:
-        logger.warning("webhook_secret_missing", message="Chave do webhook não configurada")
+        logger.warning("Chave do webhook não configurada")
         return True  # Aceita se não configurado
         
     calculated = hmac.new(

@@ -19,18 +19,12 @@ def with_retry(max_retries=3, delay=1):
                 except Exception as e:
                     last_error = e
                     logger.warning(
-                        "retry_attempt",
-                        function=func.__name__,
-                        attempt=attempt + 1,
-                        max_retries=max_retries,
-                        error=str(e)
+                        f"retry_attempt - function: {func.__name__}, attempt: {attempt + 1}/{max_retries}, error: {str(e)}"
                     )
                     if attempt < max_retries - 1:
                         time.sleep(delay * (attempt + 1))
             logger.error(
-                "max_retries_reached",
-                function=func.__name__,
-                error=str(last_error)
+                f"max_retries_reached - function: {func.__name__}, error: {str(last_error)}"
             )
             raise last_error
         return wrapper
@@ -49,9 +43,9 @@ class MercadoPagoService:
         # Teste de conexão na inicialização
         try:
             self.testar_credenciais()
-            logger.info("mercadopago_initialized", message="SDK do Mercado Pago inicializado com sucesso")
+            logger.info("SDK do Mercado Pago inicializado com sucesso")
         except Exception as e:
-            logger.error("mercadopago_initialization_error", error=str(e))
+            logger.error(f"Erro na inicialização do Mercado Pago: {str(e)}")
             # Não levanta exceção para permitir que a aplicação continue funcionando
 
     def _limpar_telefone(self, telefone):
@@ -101,19 +95,18 @@ class MercadoPagoService:
         try:
             # Validações de segurança adicionais
             if contribuicao.status != 'pendente':
-                logger.error("invalid_contribution_status: contribuicao_id=%s status=%s",
-                           contribuicao.id, contribuicao.status)
+                logger.error(f"Status de contribuição inválido: contribuicao_id={contribuicao.id} status={contribuicao.status}")
                 raise ValueError("Contribuição em estado inválido")
 
             # Verifica novamente o presente
             if presente.esta_completo:
-                logger.error("present_already_complete: presente_id=%s", presente.id)
+                logger.error(f"Presente já completamente pago: presente_id={presente.id}")
                 raise ValueError("Presente já completamente pago")
 
             # Verifica valor novamente
             valor_atual = float(contribuicao.valor)
             if valor_atual <= 0 or valor_atual > 10000:
-                logger.error("invalid_amount: valor=%s", valor_atual)
+                logger.error(f"Valor inválido para pagamento: valor={valor_atual}")
                 raise ValueError("Valor inválido para pagamento")
 
             valor_formatado = f"{valor_atual:.2f}"
@@ -127,7 +120,7 @@ class MercadoPagoService:
                 cpf_limpo = self._validar_cpf(cpf_raw)
                 telefone_limpo = self._limpar_telefone(contribuicao.telefone_contribuinte)
             except ValueError as e:
-                logger.error("validation_error: %s | contribuicao_id=%s", str(e), contribuicao.id)
+                logger.error(f"Erro de validação: {str(e)} | contribuicao_id={contribuicao.id}")
                 raise ValueError(f"Dados inválidos: {str(e)}")
 
             print(f"🎯 Criando preferência PRODUÇÃO para R$ {valor_formatado} - {nome_comprador}")
@@ -195,7 +188,7 @@ class MercadoPagoService:
             if not init_point:
                 msg = response.get('message') or response
                 print(f"❌ Erro Mercado Pago: {msg}")
-                logger.error("mp_preference_missing_init_point: %s", response)
+                logger.error(f"Erro: preferência sem init_point: {response}")
                 return None
 
             # Normalize response to always include init_point key
@@ -319,7 +312,7 @@ class MercadoPagoService:
             payment_info = self.sdk.payment().get(payment_id)
             return payment_info.get("response", {})
         except Exception as e:
-            logger.error("payment_query_error", payment_id=payment_id, error=str(e))
+            logger.error(f"Erro ao consultar pagamento {payment_id}: {str(e)}")
             return None
 
     @with_retry(max_retries=3, delay=1)
@@ -329,5 +322,5 @@ class MercadoPagoService:
             order_info = self.sdk.merchant_order().get(order_id)
             return order_info.get("response", {})
         except Exception as e:
-            logger.error("merchant_order_query_error", order_id=order_id, error=str(e))
+            logger.error(f"Erro ao consultar merchant_order {order_id}: {str(e)}")
             return None
