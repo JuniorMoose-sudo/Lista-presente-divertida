@@ -15,6 +15,7 @@ from services.mercado_pago_service import MercadoPagoService, with_retry
 webhook_bp = Blueprint("webhook", __name__, url_prefix="/webhook")
 
 ACCESS_TOKEN = os.getenv("MERCADOPAGO_ACCESS_TOKEN")
+MERCADOPAGO_WEBHOOK_SECRET = Config.MERCADOPAGO_WEBHOOK_SECRET
 
 # Validação do ACCESS_TOKEN
 if not ACCESS_TOKEN:
@@ -24,19 +25,38 @@ if not ACCESS_TOKEN:
 logger = logging.getLogger("routes.webhook")
 logger.setLevel(logging.INFO)
 
-def verify_webhook_signature(data, signature):
+def verify_webhook_signature(request_data):
     """Verifica a assinatura do webhook do Mercado Pago"""
-    if not Config.MERCADOPAGO_WEBHOOK_SECRET:
+    if not MERCADOPAGO_WEBHOOK_SECRET:
         logger.warning("Chave do webhook não configurada")
         return True  # Aceita se não configurado
-        
-    calculated = hmac.new(
-        Config.MERCADOPAGO_WEBHOOK_SECRET.encode(),
-        data.encode(),
-        hashlib.sha256
+    
+    # Obter o header de assinatura correto
+    signature_header = request.headers.get('X-Hub-Signature')
+    
+    # Se não houver assinatura, rejeita
+    if not signature_header:
+        logger.warning("Header de assinatura não encontrado")
+        return False
+    
+    # Remover o prefixo "sha256=" caso exista
+    if signature_header.startswith("sha256="):
+        signature_header = signature_header.split("sha256=")[1]
+    
+    # Calcular a assinatura usando o corpo bruto da requisição
+    computed_signature = hmac.new(
+        bytes(MERCADOPAGO_WEBHOOK_SECRET, "utf-8"),
+        msg=request_data,
+        digestmod=hashlib.sha256
     ).hexdigest()
     
-    return hmac.compare_digest(calculated, signature)
+    # Comparar de forma segura
+    is_valid = hmac.compare_digest(computed_signature, signature_header)
+    
+    if not is_valid:
+        logger.warning(f"Assinatura inválida. Esperado: {computed_signature}, Recebido: {signature_header}")
+    
+    return is_valid
 
 def extract_order_id(resource_url):
     """Extrai o ID da ordem a partir da URL completa ou ID direto"""
@@ -54,14 +74,8 @@ def process_webhook_with_retry(data, raw_data):
     action = data.get("action")
     
     # Valida a assinatura para todos os tipos de webhook
-    signature = request.headers.get('X-Hub-Signature', '')
-    
-    # Extract the hexdigest if the signature is in the format "sha256=hexdigest"
-    if signature.startswith('sha256='):
-        signature = signature[7:]  # Remove "sha256=" prefix
-
-    if not verify_webhook_signature(raw_data, signature):
-        logger.warning(f"⚠ Assinatura inválida no webhook. Dados recebidos: {raw_data}")
+    if not verify_webhook_signature(raw_data):
+        logger.warning(f"⚠ Assinatura inválida no webhook")
         return jsonify({"status": "invalid signature"}), 403
     
     # Log baseado no tipo de evento
@@ -77,7 +91,7 @@ def process_webhook_with_retry(data, raw_data):
 def mercadopago_webhook():
     try:
         # Captura os dados brutos para validação de assinatura
-        raw_data = request.data.decode('utf-8')
+        raw_data = request.data
         
         # Parse JSON data once and reuse it
         data = request.get_json(force=True)
