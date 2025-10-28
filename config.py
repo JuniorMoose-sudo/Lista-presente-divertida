@@ -4,7 +4,7 @@ import logging.config
 
 class Config:
     # Ambiente
-    PRODUCTION = bool(os.environ.get('RENDER', False))
+    PRODUCTION = os.getenv("FLASK_ENV") == "production" or os.getenv("PRODUCTION") == "1"
     
     # Segurança
     SECRET_KEY = os.environ.get('SECRET_KEY', 'chave-secreta-padrao-mudar-em-producao')
@@ -37,28 +37,33 @@ class Config:
     SITE_URL = os.environ.get('SITE_URL', 'https://lista-presente-divertida.onrender.com')
 
     
-    # Database - Configuração específica para Neon DB com SSL
+    # Database
     if PRODUCTION:
-        # URL fixa do Neon com configurações SSL corretas
-        SQLALCHEMY_DATABASE_URI = 'postgresql://neondb_owner:npg_HxOB9K6dlsfp@ep-late-firefly-a430xok0.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require'
+        # Usa DATABASE_URL do ambiente (pode conter sslmode conforme o provedor)
+        SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL")
     else:
-        # Em desenvolvimento, usa SQLite
-        SQLALCHEMY_DATABASE_URI = 'sqlite:///wedding_gifts.db'
+        # Em desenvolvimento, usa SQLite local sem ssl
+        SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL", "sqlite:///lista_casamento.db")
     
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
-    # Configurações de conexão do banco otimizadas para Neon
-    SQLALCHEMY_ENGINE_OPTIONS = {
-        'pool_size': 1,  # Menor pool para evitar muitas conexões
-        'max_overflow': 2,
-        'pool_timeout': 30,
-        'pool_recycle': 1800,
-        'pool_pre_ping': True,  # Verifica conexões antes de usar
-        'connect_args': {
-            'sslmode': 'require',
-            'options': '-c timezone=UTC'
+    # Engine options: somente aplicar SSL em produção
+    if PRODUCTION:
+        SQLALCHEMY_ENGINE_OPTIONS = {
+            'pool_size': 1,
+            'max_overflow': 2,
+            'pool_timeout': 30,
+            'pool_recycle': 1800,
+            'pool_pre_ping': True,
+            'connect_args': {
+                'sslmode': 'require',
+                'options': '-c timezone=UTC'
+            }
         }
-    }
+    else:
+        SQLALCHEMY_ENGINE_OPTIONS = {
+            'pool_pre_ping': True
+        }
     
     # Configurações do Casal
     NOIVO_NOME = "Junior & Karol"

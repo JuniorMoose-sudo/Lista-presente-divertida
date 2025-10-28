@@ -5,14 +5,13 @@
     <div class="col-lg-10">
         <div class="text-center mb-5">
             <h2 class="section-title">Nossa Lista de Presentes</h2>
-            <p class="text-muted">Escolha como quer nos presentear! Aceitamos PIX e Cartão.</p>
+            <p class="text-muted">Escolha como quer nos presentear! Pagamento via PIX.</p>
         </div>
 
         <div class="row" id="lista-presentes">
             {% for presente in presentes %}
             <div class="col-md-6 col-lg-4 mb-4">
                 <div class="card gift-card h-100">
-
                     <img src="{{ presente.imagem_url or 'https://via.placeholder.com/300x200?text=Presente' }}" 
                          class="card-img-top gift-image" 
                          alt="{{ presente.nome }}"
@@ -26,27 +25,20 @@
                             <span class="h4 text-primary">R$ {{ "%.2f"|format(presente.valor_total) }}</span>
                         </div>
 
-                        {% if presente.valor_arrecadado > 0 %}
-                        <div class="progress mb-2" style="height: 6px;">
-                            <div class="progress-bar" 
-                                 role="progressbar" 
-                                 style="width: {{ presente.progresso_porcentagem }}%"
-                                 aria-valuenow="{{ presente.progresso_porcentagem }}" 
-                                 aria-valuemin="0" 
-                                 aria-valuemax="100">
-                            </div>
+                        <div class="mb-2">
+                            <small class="text-muted">
+                                <i class="fas fa-users me-1"></i>
+                                Vários amigos podem presentear este item
+                            </small>
                         </div>
-                        <small class="text-muted">
-                            R$ {{ "%.2f"|format(presente.valor_arrecadado) }} arrecadado
-                        </small>
-                        {% endif %}
                     </div>
 
                     <div class="card-footer bg-transparent border-0 pb-3">
                         <button class="btn btn-primary w-100 btn-presentear" 
                                 data-presente-id="{{ presente.id }}"
                                 data-presente-nome="{{ presente.nome }}"
-                                data-presente-valor="{{ presente.valor_total }}">
+                                data-presente-valor="{{ presente.valor_total }}"
+                                data-valor-restante="{{ presente.valor_total }}">
                             <i class="fas fa-gift me-2"></i>Presentear
                         </button>
                     </div>
@@ -58,6 +50,7 @@
 </div>
 
 <!-- MODAL PAGAMENTO -->
+<!-- MODAL PAGAMENTO -->
 <div class="modal fade" id="modalPagamento" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -68,7 +61,15 @@
             <div class="modal-body">
                 <form id="formPagamento" novalidate>
                     <input type="hidden" id="presente_id" name="presente_id">
-                    <input type="hidden" id="presente_valor" name="presente_valor">
+                    <input type="hidden" id="valor" name="valor">
+
+                    <div class="mb-3">
+                        <label class="form-label">Valor do Presente</label>
+                        <div class="alert alert-info py-2">
+                            <h5 class="mb-0 text-center">R$ <span id="valor-exibido">0,00</span></h5>
+                            <small class="text-center d-block mt-1">Valor fixo do presente</small>
+                        </div>
+                    </div>
 
                     <div class="mb-3">
                         <label for="nome" class="form-label">Seu Nome *</label>
@@ -93,13 +94,6 @@
                     </div>
 
                     <div class="mb-3">
-                        <label for="valor" class="form-label">Valor do Presente (R$) *</label>
-                        <input type="number" class="form-control" id="valor" name="valor" 
-                               min="1" step="0.01" required>
-                        <div class="form-text">Valor sugerido: R$ <span id="valor-sugerido">0.00</span></div>
-                    </div>
-
-                    <div class="mb-3">
                         <label for="mensagem" class="form-label">Mensagem para o casal (opcional)</label>
                         <textarea class="form-control" id="mensagem" name="mensagem" rows="2" 
                                   placeholder="Deixe uma mensagem carinhosa..."></textarea>
@@ -112,13 +106,6 @@
                                    id="pix" value="pix" checked>
                             <label class="form-check-label" for="pix">
                                 <i class="fas fa-qrcode me-2"></i>PIX (Chave: 83991314075)
-                            </label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="metodo_pagamento" 
-                                   id="cartao" value="cartao">
-                            <label class="form-check-label" for="cartao">
-                                <i class="fas fa-credit-card me-2"></i>Cartão (Mercado Pago)
                             </label>
                         </div>
                     </div>
@@ -137,9 +124,6 @@
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                 <button type="button" class="btn btn-success" id="btnPagarPix">
                     <i class="fas fa-qrcode me-2"></i>Copiar Chave PIX
-                </button>
-                <button type="button" class="btn btn-primary" id="btnPagarCartao">
-                    <i class="fas fa-credit-card me-2"></i>Pagar com Cartão
                 </button>
             </div>
         </div>
@@ -179,144 +163,18 @@
     </div>
 </div>
 
-<script>
-class WeddingGiftApp {
-    constructor() {
-        this.initEventListeners();
-        this.configurarMetodoPagamento();
-    }
+<!-- MODAL LOADING -->
+<div class="modal fade" id="modalLoading" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-body text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Carregando...</span>
+                </div>
+                <p class="mt-2 mb-0">Processando pagamento...</p>
+            </div>
+        </div>
+    </div>
+</div>
 
-    initEventListeners() {
-        // Corrigido para suportar cliques no <i> dentro do botão
-        document.addEventListener('click', (e) => {
-            const btn = e.target.closest('.btn-presentear');
-            if (btn) this.openPagamentoModal(btn);
-        });
-
-        document.getElementById('btnPagarPix')?.addEventListener('click', () => this.processarPix());
-        document.getElementById('btnPagarCartao')?.addEventListener('click', () => this.processarCartao());
-
-        document.querySelectorAll('input[name="metodo_pagamento"]').forEach(radio => {
-            radio.addEventListener('change', () => this.configurarMetodoPagamento());
-        });
-    }
-
-    openPagamentoModal(button) {
-        const presenteId = button.dataset.presenteId;
-        const presenteNome = button.dataset.presenteNome;
-        const presenteValor = parseFloat(button.dataset.presenteValor);
-
-        const form = document.getElementById('formPagamento');
-        form.reset(); // limpa o formulário antes de preencher
-
-        document.getElementById('modal-presente-nome').textContent = presenteNome;
-        document.getElementById('presente_id').value = presenteId;
-        document.getElementById('presente_valor').value = presenteValor;
-        document.getElementById('valor-sugerido').textContent = presenteValor.toFixed(2);
-        document.getElementById('valor').value = presenteValor;
-
-        const modal = new bootstrap.Modal(document.getElementById('modalPagamento'));
-        modal.show();
-    }
-
-    configurarMetodoPagamento() {
-        const metodo = document.querySelector('input[name="metodo_pagamento"]:checked')?.value;
-        const infoPix = document.getElementById('info-pix');
-        const btnPix = document.getElementById('btnPagarPix');
-        const btnCartao = document.getElementById('btnPagarCartao');
-
-        if (metodo === 'pix') {
-            infoPix.style.display = 'block';
-            btnPix.style.display = 'inline-block';
-            btnCartao.style.display = 'none';
-        } else {
-            infoPix.style.display = 'none';
-            btnPix.style.display = 'none';
-            btnCartao.style.display = 'inline-block';
-        }
-    }
-
-    async processarPix() {
-        const form = document.getElementById('formPagamento');
-        if (!form.checkValidity()) return form.reportValidity();
-
-        const formData = Object.fromEntries(new FormData(form));
-        const data = {
-            ...formData,
-            presente_id: parseInt(formData.presente_id),
-            presente_nome: document.getElementById('modal-presente-nome').textContent,
-            valor: parseFloat(formData.valor),
-            metodo_pagamento: 'pix'
-        };
-
-        try {
-            const response = await fetch('/api/contribuir', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
-            });
-            const result = await response.json();
-
-            if (result.success) {
-                bootstrap.Modal.getInstance(document.getElementById('modalPagamento')).hide();
-                document.getElementById('valor-pix').textContent = data.valor.toFixed(2);
-                this.copiarChavePix();
-
-                new bootstrap.Modal(document.getElementById('modalPix')).show();
-            } else {
-                throw new Error(result.error || 'Erro ao processar PIX.');
-            }
-        } catch (err) {
-            this.showError(err.message);
-        }
-    }
-
-    async processarCartao() {
-        const form = document.getElementById('formPagamento');
-        if (!form.checkValidity()) return form.reportValidity();
-
-        const formData = Object.fromEntries(new FormData(form));
-        const data = {
-            ...formData,
-            presente_id: parseInt(formData.presente_id),
-            presente_nome: document.getElementById('modal-presente-nome').textContent,
-            valor: parseFloat(formData.valor),
-            metodo_pagamento: 'cartao'
-        };
-
-        try {
-            const response = await fetch('/api/contribuir', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
-            });
-            const result = await response.json();
-
-            if (result.success && result.payment_url) {
-                window.location.href = result.payment_url;
-            } else {
-                throw new Error(result.error || 'Erro ao iniciar pagamento com cartão.');
-            }
-        } catch (err) {
-            this.showError(err.message);
-        }
-    }
-
-    copiarChavePix() {
-        const chave = '83991314075';
-        navigator.clipboard.writeText(chave).then(() => {
-            console.log('Chave PIX copiada!');
-        }).catch(() => {
-            alert('Não foi possível copiar a chave PIX automaticamente.');
-        });
-    }
-
-    showError(msg) {
-        alert(`❌ ${msg}`);
-    }
-}
-
-// Inicializa o app
-document.addEventListener('DOMContentLoaded', () => new WeddingGiftApp());
-</script>
 {% endblock %}

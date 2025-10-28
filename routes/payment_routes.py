@@ -2,7 +2,6 @@ from flask import Blueprint, jsonify, request
 from database import db
 from models.presente import Presente
 from models.contribuicao import Contribuicao
-from services.mercado_pago_service import MercadoPagoService
 from security import limiter, logger
 from config import Config
 import hmac
@@ -147,7 +146,7 @@ def criar_contribuicao():
             valor=valor_contribuicao,
             mensagem=data.get('mensagem', ''),
             status='pendente',
-            metodo_pagamento=data.get('metodo_pagamento', 'cartao')
+            metodo_pagamento='pix'
         )
 
         db.session.add(contribuicao)
@@ -156,55 +155,123 @@ def criar_contribuicao():
         print(f"✅ Contribuição criada: {contribuicao.id} - Método: {contribuicao.metodo_pagamento}")
 
         # --- PROCESSAMENTO PIX ---
-        if data.get('metodo_pagamento') == 'pix':
-            print("🎯 Processando PIX...")
-            # Para PIX, marcamos como aprovado automaticamente
-            contribuicao.status = 'aprovado'
-            presente.valor_arrecadado = float(presente.valor_arrecadado or 0) + valor_contribuicao
-            db.session.commit()
-            return jsonify({
-                'success': True,
-                'metodo': 'pix',
-                'contribuicao_id': contribuicao.id,
-                'message': 'Contribuição registrada com sucesso!'
-            })
-
-        # --- PROCESSAMENTO MERCADO PAGO (CARTÃO) ---
-        else:
-            print("🎯 Processando Mercado Pago...")
-            mp_service = MercadoPagoService()
-            base_url = request.host_url.rstrip('/')
-            preference = mp_service.criar_preferencia_pagamento(contribuicao, presente, base_url)
-
-            print(f"🎯 Preference response: {preference}")
-
-            if not preference or not preference.get('init_point'):
-                error_msg = "Erro ao gerar link de pagamento com Mercado Pago"
-                print(f"❌ {error_msg} - {preference}")
-
-                # Remove a contribuição se falhou
-                db.session.delete(contribuicao)
-                db.session.commit()
-
-                return jsonify({
-                    'success': False,
-                    'error': error_msg,
-                    'raw': preference
-                }), 500
-
-            # Atualiza com ID do pagamento
-            contribuicao.payment_id = preference.get('id') or (preference.get('raw') or {}).get('id')
-            db.session.commit()
-
-            return jsonify({
-                'success': True,
-                'payment_url': preference['init_point'],
-                'contribuicao_id': contribuicao.id,
-                'metodo': 'cartao'
-            })
+        print("🎯 Processando PIX...")
+        # Para PIX, marcamos como aprovado automaticamente
+        contribuicao.status = 'aprovado'
+        presente.valor_arrecadado = float(presente.valor_arrecadado or 0) + valor_contribuicao
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'metodo': 'pix',
+            'contribuicao_id': contribuicao.id,
+            'message': 'Contribuição registrada com sucesso!'
+        })
     except Exception as e:
         db.session.rollback()
         print(f"💥 Erro geral: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+# Rota desativada: Stripe desabilitado
+# @payment_bp.route('/create-checkout-session', methods=['POST'])
+# @limiter.limit("10/minute")
+# def create_checkout_session():
+    try:
+        data = request.get_json()
+        
+        # Validações básicas
+        if not data or not all(k in data for k in ['presente_id', 'nome', 'email', 'valor', 'cpf']):
+            return jsonify({
+                'success': False,
+                'error': 'Dados incompletos'
+            }), 400
+            
+        # Validações de negócio (reutilizando as mesmas validações da rota /api/contribuir)
+        validation_errors = ValidationService.validar_contribuicao(
+            data['presente_id'],
+            data['valor'],
+            data['email']
+        )
+        
+        if validation_errors:
+            return jsonify({
+                'success': False,
+                'error': validation_errors[0],
+                'all_errors': validation_errors
+            }), 422
+            
+        presente = Presente.query.get(data['presente_id'])
+        if not presente:
+            return jsonify({
+                'success': False,
+                'error': 'Presente não encontrado'
+            }), 404
+            
+        # Trata valor com vírgula ou ponto
+        try:
+            valor_str = str(data['valor']).replace(',', '.')
+            valor_contribuicao = float(valor_str)
+        except (ValueError, TypeError):
+            return jsonify({
+                'success': False,
+                'error': 'Valor inválido'
+            }), 400
+            
+        # Prepara dados pessoais
+        cpf_raw = data.get('cpf', '')
+        if isinstance(cpf_raw, str):
+            cpf_raw = cpf_raw.replace('.', '').replace('-', '').strip()
+        telefone_raw = data.get('telefone', '')
+        
+        # Cria a contribuição
+        contribuicao = Contribuicao(
+            presente_id=presente.id,
+            nome_contribuinte=data['nome'],
+            email_contribuinte=data['email'],
+            cpf_contribuinte=cpf_raw,
+            telefone_contribuinte=telefone_raw,
+            valor=valor_contribuicao,
+            mensagem=data.get('mensagem', ''),
+            status='pendente',
+            metodo_pagamento='stripe'
+        )
+        
+        db.session.add(contribuicao)
+        db.session.flush()  # Gera o ID mas não commita ainda
+        
+        # Cria a sessão de checkout do Stripe
+        stripe_service = StripeService()
+        base_url = request.host_url.rstrip('/')
+        checkout_session = stripe_service.criar_checkout_session(contribuicao, presente, base_url)
+        
+        if not checkout_session or not checkout_session.get('id'):
+            # Remove a contribuição se falhou
+            db.session.delete(contribuicao)
+            db.session.commit()
+            
+            return jsonify({
+                'success': False,
+                'error': 'Erro ao criar sessão de checkout'
+            }), 500
+            
+        # Atualiza com ID da sessão
+        contribuicao.payment_id = checkout_session.get('id')
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'sessionId': checkout_session['id'],
+            'url': checkout_session['url'],
+            'contribuicao_id': contribuicao.id
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"💥 Erro ao criar sessão de checkout: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({
@@ -302,8 +369,9 @@ def pendente():
     </html>
     """
 
-@payment_bp.route('/api/test-mp-credentials')
-def test_mp_credentials():
+# Rota desativada: Mercado Pago desabilitado
+# @payment_bp.route('/api/test-mp-credentials')
+# def test_mp_credentials():
     try:
         from services.mercado_pago_service import MercadoPagoService
         mp_service = MercadoPagoService()
@@ -325,6 +393,25 @@ def test_mp_credentials():
             'success': True,
             'message': 'Credenciais OK',
             'response_keys': list(result.get('response', {}).keys()) if result else []
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+        
+# Rota desativada: Stripe desabilitado
+# @payment_bp.route('/api/test-stripe-credentials')
+# def test_stripe_credentials():
+    try:
+        stripe_service = StripeService()
+        result = stripe_service.testar_credenciais()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Credenciais do Stripe OK',
+            'result': result
         })
         
     except Exception as e:

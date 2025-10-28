@@ -10,12 +10,15 @@ from database import db
 from models.contribuicao import Contribuicao
 from models.presente import Presente
 from config import Config
-from services.mercado_pago_service import MercadoPagoService, with_retry
+# Integradores desativados
+# from services.mercado_pago_service import MercadoPagoService, with_retry
+# from services.stripe_service import StripeService
 
 webhook_bp = Blueprint("webhook", __name__, url_prefix="/webhook")
 
-ACCESS_TOKEN = os.getenv("MERCADOPAGO_ACCESS_TOKEN")
-MERCADOPAGO_WEBHOOK_SECRET = Config.MERCADOPAGO_WEBHOOK_SECRET
+# Webhooks desativados
+MERCADOPAGO_WEBHOOK_SECRET = None
+STRIPE_WEBHOOK_SECRET = None
 
 logger = logging.getLogger("routes.webhook")
 logger.setLevel(logging.INFO)
@@ -26,18 +29,15 @@ if not logger.handlers:
     handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
     logger.addHandler(handler)
 
-# 🔹 Aviso se token estiver ausente
-if not ACCESS_TOKEN:
-    logger.error("❌ MERCADOPAGO_ACCESS_TOKEN não encontrado nas variáveis de ambiente.")
-
+# Webhooks desativados: sem avisos sobre tokens ausentes
 
 # ==========================================================
-# 🔐 Verificação da assinatura do webhook
+# 🔐 Verificação da assinatura do webhook do Mercado Pago
 # ==========================================================
-def verify_webhook_signature(request_data, data=None):
+def verify_mercadopago_webhook_signature(request_data, data=None):
     """Verifica a assinatura do webhook do Mercado Pago"""
     if not MERCADOPAGO_WEBHOOK_SECRET:
-        logger.warning("⚠ Chave do webhook não configurada — aceitando todas as requisições.")
+        logger.warning("⚠ Chave do webhook do Mercado Pago não configurada — aceitando todas as requisições.")
         return True  # evita bloqueio caso variável não esteja definida
 
     signature_header = request.headers.get("X-Hub-Signature")
@@ -85,9 +85,8 @@ def verify_webhook_signature(request_data, data=None):
 
     return is_valid
 
-
 # ==========================================================
-# 🧩 Extrair ID da ordem
+# 🧩 Extrair ID da ordem do Mercado Pago
 # ==========================================================
 def extract_order_id(resource_url):
     """Extrai o ID da ordem a partir da URL completa ou ID direto"""
@@ -96,19 +95,18 @@ def extract_order_id(resource_url):
     match = re.search(r"/merchant_orders/(\d+)", str(resource_url))
     return match.group(1) if match else str(resource_url)
 
-
 # ==========================================================
-# 🔄 Processamento do webhook (com retry)
+# 🔄 Processamento do webhook do Mercado Pago (com retry)
 # ==========================================================
-@with_retry(max_retries=3, delay=1)
-def process_webhook_with_retry(data, raw_data):
-    """Processa webhook com retry em caso de falha"""
+# with_retry removido
+def process_mercadopago_webhook_with_retry(data, raw_data):
+    """Processa webhook do Mercado Pago com retry em caso de falha"""
     topic = data.get("topic") or request.args.get("topic")
     type_event = data.get("type")
 
     # 🔹 Validação da assinatura
-    if not verify_webhook_signature(raw_data, data):
-        logger.warning("⚠ Assinatura inválida no webhook.")
+    if not verify_mercadopago_webhook_signature(raw_data, data):
+        logger.warning("⚠ Assinatura inválida no webhook do Mercado Pago.")
         return jsonify({"status": "invalid signature"}), 403
 
     # 🔹 Log amigável
@@ -117,32 +115,20 @@ def process_webhook_with_retry(data, raw_data):
     else:
         logger.info(f"💳 PAYMENT webhook recebido: {data}")
 
-    return process_webhook_data(data)
-
+    return process_mercadopago_webhook_data(data)
 
 # ==========================================================
-# 🌐 Rota principal do Webhook
+# 🌐 Rota do Webhook do Mercado Pago
 # ==========================================================
 @webhook_bp.route("/mercadopago", methods=["POST"])
 def mercadopago_webhook():
-    try:
-        raw_data = request.data  # corpo bruto da requisição
-        data = request.get_json(force=True)
-
-        logger.info(f"📩 Webhook recebido: {data}")
-        return process_webhook_with_retry(data, raw_data)
-
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"❌ Erro ao processar webhook: {e}", exc_info=True)
-        return jsonify({"error": str(e)}), 500
-
+    return jsonify({"status": "mercadopago_webhook_disabled"}), 200
 
 # ==========================================================
-# ⚙️ Processamento dos dados do webhook
+# ⚙️ Processamento dos dados do webhook do Mercado Pago
 # ==========================================================
-def process_webhook_data(data):
-    """Processa os dados do webhook e direciona para o handler correto"""
+def process_mercadopago_webhook_data(data):
+    """Processa os dados do webhook do Mercado Pago e direciona para o handler correto"""
     payment_id = None
     topic = None
     action = None
@@ -156,27 +142,26 @@ def process_webhook_data(data):
         payment_id = data.get("resource") or request.args.get("id") or data.get("id")
 
     if not topic or not payment_id:
-        logger.warning("⚠ Webhook sem topic/type ou id.")
+        logger.warning("⚠ Webhook do Mercado Pago sem topic/type ou id.")
         return jsonify({"status": "ignored"}), 200
 
     if "payment" in (topic or "") or "payment" in (action or ""):
-        return handle_payment(payment_id)
+        return handle_mercadopago_payment(payment_id)
 
     elif "merchant_order" in (topic or "") or "merchant_order" in (action or ""):
         order_id = extract_order_id(payment_id)
         return handle_merchant_order(order_id)
 
     else:
-        logger.warning(f"⚠ Tipo de webhook desconhecido: topic={topic}, action={action}")
+        logger.warning(f"⚠ Tipo de webhook do Mercado Pago desconhecido: topic={topic}, action={action}")
         return jsonify({"status": "ignored"}), 200
 
-
 # ==========================================================
-# 💳 Handler: Pagamento
+# 💳 Handler: Pagamento do Mercado Pago
 # ==========================================================
-@with_retry(max_retries=3, delay=1)
-def handle_payment(payment_id):
-    """Busca informações de pagamento e atualiza contribuição"""
+# Desativado
+# def handle_mercadopago_payment(payment_id):
+    """Busca informações de pagamento do Mercado Pago e atualiza contribuição"""
     try:
         mp_service = MercadoPagoService()
         payment_info = mp_service.consultar_pagamento(payment_id)
@@ -186,7 +171,7 @@ def handle_payment(payment_id):
             return jsonify({"status": "payment_not_found"}), 200
 
         payment = payment_info.get("response", {})
-        logger.info(f"💰 Pagamento recebido: {payment}")
+        logger.info(f"💰 Pagamento do Mercado Pago recebido: {payment}")
 
         contribuicao = Contribuicao.query.filter_by(payment_id=str(payment_id)).first()
         if not contribuicao:
@@ -219,16 +204,15 @@ def handle_payment(payment_id):
 
     except Exception as e:
         db.session.rollback()
-        logger.error(f"❌ Erro ao processar pagamento {payment_id}: {e}", exc_info=True)
+        logger.error(f"❌ Erro ao processar pagamento do Mercado Pago {payment_id}: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
-
 # ==========================================================
-# 📦 Handler: Merchant Order
+# 📦 Handler: Merchant Order do Mercado Pago
 # ==========================================================
-@with_retry(max_retries=3, delay=1)
-def handle_merchant_order(order_id):
-    """Busca informações do pedido (merchant order)"""
+# Desativado
+# def handle_merchant_order(order_id):
+    """Busca informações do pedido (merchant order) do Mercado Pago"""
     try:
         mp_service = MercadoPagoService()
         order_info = mp_service.consultar_merchant_order(order_id)
@@ -238,7 +222,7 @@ def handle_merchant_order(order_id):
             return jsonify({"status": "merchant_order_not_found"}), 200
 
         order = order_info.get("response", {})
-        logger.info(f"📦 Merchant order recebida: {order}")
+        logger.info(f"📦 Merchant order do Mercado Pago recebida: {order}")
 
         payments = order.get("payments", [])
         if not payments:
@@ -247,11 +231,60 @@ def handle_merchant_order(order_id):
 
         payment_id = payments[0].get("id")
         if payment_id:
-            return handle_payment(payment_id)
+            return handle_mercadopago_payment(payment_id)
 
         return jsonify({"status": "no_payment_found"}), 200
 
     except Exception as e:
         db.session.rollback()
-        logger.error(f"❌ Erro ao processar merchant_order {order_id}: {e}", exc_info=True)
+        logger.error(f"❌ Erro ao processar merchant_order do Mercado Pago {order_id}: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+# ==========================================================
+# 🌐 Rota do Webhook do Stripe
+# ==========================================================
+
+@webhook_bp.route("/stripe", methods=["POST"])
+def stripe_webhook():
+    return jsonify({"status": "stripe_webhook_disabled"}), 200
+
+# ==========================================================
+# 💳 Handler: Pagamento do Stripe
+# ==========================================================
+
+# Desativado
+# def handle_stripe_payment(webhook_data):
+    """Atualiza a contribuição com base nos dados do webhook do Stripe"""
+    try:
+        contribuicao_id = webhook_data.get("contribuicao_id")
+        status = webhook_data.get("status")
+        
+        if not contribuicao_id or not status:
+            logger.warning(f"⚠ Dados incompletos no webhook do Stripe: {webhook_data}")
+            return jsonify({"status": "incomplete_data"}), 400
+            
+        contribuicao = Contribuicao.query.get(contribuicao_id)
+        if not contribuicao:
+            logger.warning(f"⚠ Contribuição {contribuicao_id} não encontrada.")
+            return jsonify({"status": "not_found"}), 404
+            
+        if contribuicao.status == status:
+            logger.info(f"ℹ Contribuição {contribuicao.id} já está no status '{status}', ignorando.")
+            return jsonify({"status": "already_processed"}), 200
+            
+        contribuicao.status = status
+        
+        # Atualiza o valor arrecadado se o pagamento for aprovado
+        if status == "approved":
+            presente = Presente.query.get(contribuicao.presente_id)
+            if presente:
+                presente.valor_arrecadado = float(presente.valor_arrecadado or 0) + float(contribuicao.valor)
+                logger.info(f"💰 Valor arrecadado atualizado para {presente.valor_arrecadado}")
+                
+        db.session.commit()
+        logger.info(f"✅ Contribuição {contribuicao.id} atualizada para '{status}'")
+        return jsonify({"status": "ok"}), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"❌ Erro ao processar pagamento do Stripe: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
