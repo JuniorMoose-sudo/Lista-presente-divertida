@@ -2,7 +2,6 @@ from flask import Blueprint, jsonify, request
 from database import db
 from models.presente import Presente
 from models.contribuicao import Contribuicao
-from services.mercado_pago_service import MercadoPagoService
 
 present_bp = Blueprint('presentes', __name__)
 

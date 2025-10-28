@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, render_template
 from database import db
 from models.presente import Presente
 from models.contribuicao import Contribuicao
@@ -9,10 +9,10 @@ import hashlib
 import time
 import functools
 
-payment_bp = Blueprint('pagamentos', __name__)
+present_bp = Blueprint('present', __name__)
 
 def verify_webhook_signature(data, signature):
-    """Verifica a assinatura do webhook do Mercado Pago"""
+    """Verifica a assinatura do webhook (mantido para futuras implementações)"""
     if not Config.MERCADOPAGO_WEBHOOK_SECRET:
         logger.warning("webhook_secret_missing", message="Chave do webhook não configurada")
         return True  # Aceita se não configurado
@@ -54,16 +54,91 @@ def with_retry(max_retries=3, delay=1):
         return wrapper
     return decorator
 
-from services.validation_service import ValidationService
+# Serviço de validação simplificado
+class ValidationService:
+    @staticmethod
+    def validar_contribuicao(presente_id, valor, email):
+        """Valida dados da contribuição"""
+        errors = []
+        
+        # Valida presente
+        presente = Presente.query.get(presente_id)
+        if not presente:
+            errors.append('Presente não encontrado')
+            return errors
+            
+        if not presente.active:
+            errors.append('Este presente não está mais disponível')
+            
+        # Valida valor
+        try:
+            valor_float = float(str(valor).replace(',', '.'))
+            if valor_float <= 0:
+                errors.append('Valor deve ser maior que zero')
+            elif valor_float > presente.valor_total:
+                errors.append('Valor excede o valor total do presente')
+        except (ValueError, TypeError):
+            errors.append('Valor inválido')
+            
+        # Valida email básico
+        if '@' not in email or '.' not in email:
+            errors.append('Email inválido')
+            
+        return errors
+    
+    @staticmethod
+    def validar_presente_disponivel(presente_id):
+        """Verifica se o presente está disponível"""
+        presente = Presente.query.get(presente_id)
+        if not presente:
+            return False, 'Presente não encontrado'
+            
+        if not presente.active:
+            return False, 'Presente não está mais disponível'
+            
+        return True, None
+    
+    @staticmethod
+    def verificar_valor_maximo_diario(email):
+        """Verifica limite diário por email"""
+        # Implementação simplificada - sempre retorna False (sem limite)
+        return False
 
-@payment_bp.route('/api/contribuir', methods=['POST'])
-@limiter.limit("10/minute")  # Limite de 10 tentativas por minuto por IP
+@present_bp.route('/')
+def index():
+    """Página principal com lista de presentes"""
+    presents = Presente.query.filter_by(active=True).all()
+    return render_template('index.html', presents=presents)
+
+@present_bp.route('/api/presentes')
+def get_presents():
+    """API para obter lista de presentes"""
+    try:
+        presents = Presente.query.filter_by(active=True).all()
+        presents_data = []
+        for present in presents:
+            presents_data.append({
+                'id': present.id,
+                'nome': present.nome,
+                'descricao': present.descricao,
+                'valor_total': float(present.valor_total),
+                'imagem_url': present.imagem_url,
+                'active': present.active
+            })
+        return jsonify({'success': True, 'presents': presents_data})
+    except Exception as e:
+        logger.error("error_getting_presents", error=str(e))
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@present_bp.route('/api/contribuir', methods=['POST'])
+@limiter.limit("10/minute")
 def criar_contribuicao():
+    """Processa contribuição via PIX"""
     try:
         data = request.get_json()
         logger.info("contribution_request_received", data=data)
         
-        # --- Validações básicas ---
+        # Validações básicas
         if not data or not all(k in data for k in ['presente_id', 'nome', 'email', 'valor', 'cpf']):
             return jsonify({
                 'success': False,
@@ -130,103 +205,12 @@ def criar_contribuicao():
                 'error': 'Valor deve ser maior que zero'
             }), 400
 
-        # --- Prepara dados pessoais ---
-        cpf_raw = data.get('cpf', '')
-        if isinstance(cpf_raw, str):
-            cpf_raw = cpf_raw.replace('.', '').replace('-', '').strip()
-        telefone_raw = data.get('telefone', '')
-
-        # --- Cria a contribuição ---
-        contribuicao = Contribuicao(
-            presente_id=presente.id,
-            nome_contribuinte=data['nome'],
-            email_contribuinte=data['email'],
-            cpf_contribuinte=cpf_raw,
-            telefone_contribuinte=telefone_raw,
-            valor=valor_contribuicao,
-            mensagem=data.get('mensagem', ''),
-            status='pendente',
-            metodo_pagamento='pix'
-        )
-
-        db.session.add(contribuicao)
-        db.session.flush()  # Gera o ID mas não commita ainda
-
-        print(f"✅ Contribuição criada: {contribuicao.id} - Método: {contribuicao.metodo_pagamento}")
-
-        # --- PROCESSAMENTO PIX ---
-        print("🎯 Processando PIX...")
-        # Para PIX, marcamos como aprovado automaticamente
-        contribuicao.status = 'aprovado'
-        presente.valor_arrecadado = float(presente.valor_arrecadado or 0) + valor_contribuicao
-        db.session.commit()
-        return jsonify({
-            'success': True,
-            'metodo': 'pix',
-            'contribuicao_id': contribuicao.id,
-            'message': 'Contribuição registrada com sucesso!'
-        })
-    except Exception as e:
-        db.session.rollback()
-        print(f"💥 Erro geral: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-# Rota desativada: Stripe desabilitado
-# @payment_bp.route('/create-checkout-session', methods=['POST'])
-# @limiter.limit("10/minute")
-# def create_checkout_session():
-    try:
-        data = request.get_json()
-        
-        # Validações básicas
-        if not data or not all(k in data for k in ['presente_id', 'nome', 'email', 'valor', 'cpf']):
-            return jsonify({
-                'success': False,
-                'error': 'Dados incompletos'
-            }), 400
-            
-        # Validações de negócio (reutilizando as mesmas validações da rota /api/contribuir)
-        validation_errors = ValidationService.validar_contribuicao(
-            data['presente_id'],
-            data['valor'],
-            data['email']
-        )
-        
-        if validation_errors:
-            return jsonify({
-                'success': False,
-                'error': validation_errors[0],
-                'all_errors': validation_errors
-            }), 422
-            
-        presente = Presente.query.get(data['presente_id'])
-        if not presente:
-            return jsonify({
-                'success': False,
-                'error': 'Presente não encontrado'
-            }), 404
-            
-        # Trata valor com vírgula ou ponto
-        try:
-            valor_str = str(data['valor']).replace(',', '.')
-            valor_contribuicao = float(valor_str)
-        except (ValueError, TypeError):
-            return jsonify({
-                'success': False,
-                'error': 'Valor inválido'
-            }), 400
-            
         # Prepara dados pessoais
         cpf_raw = data.get('cpf', '')
         if isinstance(cpf_raw, str):
             cpf_raw = cpf_raw.replace('.', '').replace('-', '').strip()
         telefone_raw = data.get('telefone', '')
-        
+
         # Cria a contribuição
         contribuicao = Contribuicao(
             presente_id=presente.id,
@@ -236,51 +220,39 @@ def criar_contribuicao():
             telefone_contribuinte=telefone_raw,
             valor=valor_contribuicao,
             mensagem=data.get('mensagem', ''),
-            status='pendente',
-            metodo_pagamento='stripe'
+            status='aprovado',  # PIX é aprovado automaticamente
+            metodo_pagamento='pix'
         )
-        
+
         db.session.add(contribuicao)
-        db.session.flush()  # Gera o ID mas não commita ainda
         
-        # Cria a sessão de checkout do Stripe
-        stripe_service = StripeService()
-        base_url = request.host_url.rstrip('/')
-        checkout_session = stripe_service.criar_checkout_session(contribuicao, presente, base_url)
+        # Atualiza valor arrecadado do presente
+        presente.valor_arrecadado = float(presente.valor_arrecadado or 0) + valor_contribuicao
         
-        if not checkout_session or not checkout_session.get('id'):
-            # Remove a contribuição se falhou
-            db.session.delete(contribuicao)
-            db.session.commit()
-            
-            return jsonify({
-                'success': False,
-                'error': 'Erro ao criar sessão de checkout'
-            }), 500
-            
-        # Atualiza com ID da sessão
-        contribuicao.payment_id = checkout_session.get('id')
         db.session.commit()
+        
+        logger.info("contribution_created", 
+                   contribuicao_id=contribuicao.id,
+                   valor=valor_contribuicao,
+                   metodo='pix')
         
         return jsonify({
             'success': True,
-            'sessionId': checkout_session['id'],
-            'url': checkout_session['url'],
-            'contribuicao_id': contribuicao.id
+            'contribuicao_id': contribuicao.id,
+            'message': 'Contribuição registrada com sucesso via PIX!'
         })
         
     except Exception as e:
         db.session.rollback()
-        print(f"💥 Erro ao criar sessão de checkout: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error("contribution_error", error=str(e))
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': 'Erro interno do servidor'
         }), 500
 
-@payment_bp.route('/obrigado')
+@present_bp.route('/obrigado')
 def obrigado():
+    """Página de agradecimento"""
     contribuicao_id = request.args.get('contribuicao_id', '')
     return f"""
     <!DOCTYPE html>
@@ -309,10 +281,10 @@ def obrigado():
     </html>
     """
 
-@payment_bp.route('/erro')
+@present_bp.route('/erro')
 def erro():
-    contribuicao_id = request.args.get('contribuicao_id', '')
-    return f"""
+    """Página de erro"""
+    return """
     <!DOCTYPE html>
     <html>
     <head>
@@ -338,84 +310,3 @@ def erro():
     </body>
     </html>
     """
-
-@payment_bp.route('/pendente')
-def pendente():
-    contribuicao_id = request.args.get('contribuicao_id', '')
-    return f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Pagamento Pendente</title>
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-        <style>
-            body {{ background: linear-gradient(135deg, #ffd166, #ff9e00); min-height: 100vh; display: flex; align-items: center; }}
-        </style>
-    </head>
-    <body>
-        <div class="container text-center text-dark">
-            <div class="row justify-content-center">
-                <div class="col-md-6">
-                    <div class="bg-light bg-opacity-75 rounded p-5">
-                        <h1 class="display-4">⏳ Pagamento Pendente</h1>
-                        <p class="lead">Seu pagamento está sendo processado.</p>
-                        <p>Você receberá uma confirmação por email em breve.</p>
-                        <a href="/" class="btn btn-primary btn-lg mt-3">Voltar para a Lista de Presentes</a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </body>
-    </html>
-    """
-
-# Rota desativada: Mercado Pago desabilitado
-# @payment_bp.route('/api/test-mp-credentials')
-# def test_mp_credentials():
-    try:
-        from services.mercado_pago_service import MercadoPagoService
-        mp_service = MercadoPagoService()
-        
-        test_data = {
-            "items": [
-                {
-                    "title": "Teste",
-                    "quantity": 1,
-                    "currency_id": "BRL",
-                    "unit_price": 10.0
-                }
-            ]
-        }
-        
-        result = mp_service.sdk.preference().create(test_data)
-        
-        return jsonify({
-            'success': True,
-            'message': 'Credenciais OK',
-            'response_keys': list(result.get('response', {}).keys()) if result else []
-        })
-        
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-        
-# Rota desativada: Stripe desabilitado
-# @payment_bp.route('/api/test-stripe-credentials')
-# def test_stripe_credentials():
-    try:
-        stripe_service = StripeService()
-        result = stripe_service.testar_credenciais()
-        
-        return jsonify({
-            'success': True,
-            'message': 'Credenciais do Stripe OK',
-            'result': result
-        })
-        
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500

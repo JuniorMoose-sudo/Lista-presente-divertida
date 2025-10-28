@@ -36,7 +36,7 @@ def create_app():
     @cache.cached(timeout=300)  # Cache por 5 minutos
     def index():
         try:
-            presentes = Presente.query.filter_by(ativo=True).all()
+            presentes = Presente.query.filter_by(ativo=True).all()  # Corrigido: usa 'ativo'
             logger.info("presentes_carregados", quantidade=len(presentes))
             return render_template('index.html', 
                                  presentes=presentes,
@@ -55,10 +55,21 @@ def create_app():
             return jsonify({
                 'status': 'healthy', 
                 'database': 'connected',
-                'environment': 'production' if os.environ.get('RENDER') else 'development'
+                'environment': 'production' if os.environ.get('RENDER') else 'development',
+                'uptime': f"{time.time() - app.start_time:.2f}s"
             })
         except Exception as e:
             return jsonify({'status': 'unhealthy', 'error': str(e)}), 500
+    
+    # Rota de status da API
+    @app.route('/api/status')
+    def api_status():
+        return jsonify({
+            'status': 'online',
+            'service': 'wedding-gift-app',
+            'version': '1.0.0',
+            'payment_methods': ['pix']
+        })
     
     return app
 
@@ -71,6 +82,7 @@ if os.environ.get('RENDER'):
         from init_db import init_sample_data
         with app.app_context():
             init_sample_data()
+            print("✅ Dados de exemplo inicializados com sucesso!")
     except Exception as e:
         print(f"❌ Erro na inicialização: {e}")
 else:
