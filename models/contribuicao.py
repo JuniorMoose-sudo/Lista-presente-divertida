@@ -11,7 +11,7 @@ class Contribuicao(db.Model):
     # Novos campos para CPF e Telefone
     cpf_contribuinte = db.Column(db.String(20))
     telefone_contribuinte = db.Column(db.String(30))
-    valor = db.Column(db.Numeric(10, 2), nullable=False)  # Mudei de Float para Numeric
+    valor = db.Column(db.Numeric(10, 2), nullable=False)
     mensagem = db.Column(db.Text)
     status = db.Column(db.String(20), default='pendente')
     payment_id = db.Column(db.String(100))

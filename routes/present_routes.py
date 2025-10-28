@@ -36,7 +36,3 @@ def obter_presente(presente_id):
             'success': False,
             'error': str(e)
         }), 404
-
-
-# Nota: a rota `/api/contribuir` foi movida para `routes/payment_routes.py`.
-# Removida aqui para evitar duplicação de endpoints.

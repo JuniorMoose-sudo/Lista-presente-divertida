@@ -2,12 +2,15 @@ import os
 import logging
 import requests
 import re
+import hmac
+import hashlib
+import time
 from flask import Blueprint, request, jsonify
 from database import db
 from models.contribuicao import Contribuicao
 from models.presente import Presente
-from routes.payment_routes import verify_webhook_signature
-from services.mercado_pago_service import MercadoPagoService
+from config import Config
+from services.mercado_pago_service import MercadoPagoService, with_retry
 
 webhook_bp = Blueprint("webhook", __name__, url_prefix="/webhook")
 
@@ -21,6 +24,20 @@ if not ACCESS_TOKEN:
 logger = logging.getLogger("routes.webhook")
 logger.setLevel(logging.INFO)
 
+def verify_webhook_signature(data, signature):
+    """Verifica a assinatura do webhook do Mercado Pago"""
+    if not Config.MERCADOPAGO_WEBHOOK_SECRET:
+        logger.warning("webhook_secret_missing", message="Chave do webhook não configurada")
+        return True  # Aceita se não configurado
+        
+    calculated = hmac.new(
+        Config.MERCADOPAGO_WEBHOOK_SECRET.encode(),
+        data.encode(),
+        hashlib.sha256
+    ).hexdigest()
+    
+    return hmac.compare_digest(calculated, signature)
+
 def extract_order_id(resource_url):
     """Extrai o ID da ordem a partir da URL completa ou ID direto"""
     if not resource_url:
@@ -28,31 +45,45 @@ def extract_order_id(resource_url):
     match = re.search(r'/merchant_orders/(\d+)', resource_url)
     return match.group(1) if match else str(resource_url)
 
+@with_retry(max_retries=3, delay=1)
+def process_webhook_with_retry(data, raw_data):
+    """Processa webhook com retry em caso de falha"""
+    # Extrai informações do webhook
+    topic = data.get("topic") or request.args.get("topic")
+    type_event = data.get("type")
+    action = data.get("action")
+    
+    # Valida a assinatura para todos os tipos de webhook
+    signature = request.headers.get('X-Hub-Signature', '')
+    
+    # Extract the hexdigest if the signature is in the format "sha256=hexdigest"
+    if signature.startswith('sha256='):
+        signature = signature[7:]  # Remove "sha256=" prefix
+
+    if not verify_webhook_signature(raw_data, signature):
+        logger.warning(f"⚠ Assinatura inválida no webhook. Dados recebidos: {raw_data}")
+        return jsonify({"status": "invalid signature"}), 403
+    
+    # Log baseado no tipo de evento
+    if "merchant_order" in (topic or "") or "merchant_order" in (type_event or ""):
+        logger.info(f"📦 MERCHANT ORDER webhook recebido: {data}")
+    else:
+        logger.info(f"💳 PAYMENT webhook recebido: {data}")
+    
+    # Continua com o processamento normal
+    return process_webhook_data(data)
+
 @webhook_bp.route("/mercadopago", methods=["POST"])
 def mercadopago_webhook():
     try:
+        # Captura os dados brutos para validação de assinatura
         raw_data = request.data.decode('utf-8')
         
         # Parse JSON data once and reuse it
         data = request.get_json(force=True)
-        topic = data.get("topic") or request.args.get("topic")
         
-        # Bypass signature validation for merchant_order webhooks
-        if topic == "merchant_order":
-            logger.info(f"📦 MERCHANT ORDER webhook recebido: {data}")
-        else:
-            # For other webhook types, validate the signature
-            signature = request.headers.get('X-Hub-Signature', '')
-            
-            # Extract the hexdigest if the signature is in the format "sha256=hexdigest"
-            if signature.startswith('sha256='):
-                signature = signature[7:]  # Remove "sha256=" prefix
-
-            if not verify_webhook_signature(raw_data, signature):
-                logger.warning(f"⚠ Assinatura inválida no webhook. Dados recebidos: {raw_data}")
-                return jsonify({"status": "invalid signature"}), 403
-            
-            logger.info(f"💳 PAYMENT webhook recebido: {data}")
+        # Processa o webhook com retry
+        return process_webhook_with_retry(data, raw_data)
 
         # Suporte completo aos formatos antigo e novo do Mercado Pago
         payment_id = None
@@ -94,13 +125,50 @@ def mercadopago_webhook():
         logger.error(f"❌ Erro ao processar webhook: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
+def process_webhook_data(data):
+    """Processa os dados do webhook e direciona para o handler correto"""
+    # Suporte completo aos formatos antigo e novo do Mercado Pago
+    payment_id = None
+    topic = None
+    action = None
 
+    # Formato novo (2023+): {"type": "payment", "action": "payment.created", "data": {"id": "123"}}
+    if "type" in data and "data" in data:
+        topic = data["type"]
+        action = data.get("action")
+        payment_id = data["data"].get("id")
+    
+    # Formato antigo: {"topic": "payment", "resource": "123"} ou parâmetros URL
+    else:
+        topic = data.get("topic") or request.args.get("topic")
+        payment_id = data.get("resource") or request.args.get("id") or data.get("id")
+
+    if not topic or not payment_id:
+        logger.warning("❌ Webhook sem topic/type ou id")
+        return jsonify({"status": "ignored"}), 200
+
+    # Detecção melhorada de eventos de pagamento
+    # Formato antigo: topic="payment"
+    # Formato novo: type="payment" ou action="payment.created"
+    if "payment" in (topic or "") or "payment" in (action or ""):
+        return handle_payment(payment_id)
+    
+    # Detecção de merchant_order
+    elif "merchant_order" in (topic or "") or "merchant_order" in (action or ""):
+        order_id = extract_order_id(payment_id)
+        return handle_merchant_order(order_id)
+
+    else:
+        logger.warning(f"⚠ Tipo de webhook desconhecido: topic={topic}, action={action}")
+        return jsonify({"status": "ignored"}), 200
+
+@with_retry(max_retries=3, delay=1)
 def handle_payment(payment_id):
     """Busca informações de pagamento e atualiza contribuição"""
     try:
         # Busca dados atualizados do pagamento usando o SDK
         mp_service = MercadoPagoService()
-        payment_info = mp_service.sdk.payment().get(payment_id)
+        payment_info = mp_service.consultar_pagamento(payment_id)
         
         if not payment_info or not payment_info.get('response'):
             logger.warning(f"⚠ Falha ao buscar pagamento {payment_id}")
@@ -148,12 +216,12 @@ def handle_payment(payment_id):
         logger.error(f"❌ Erro ao processar pagamento {payment_id}: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
-
+@with_retry(max_retries=3, delay=1)
 def handle_merchant_order(order_id):
     """Busca informações do pedido (merchant order)"""
     try:
         mp_service = MercadoPagoService()
-        order_info = mp_service.sdk.merchant_order().get(order_id)
+        order_info = mp_service.consultar_merchant_order(order_id)
         
         if not order_info or not order_info.get('response'):
             logger.warning(f"⚠ Falha ao buscar merchant_order {order_id}")

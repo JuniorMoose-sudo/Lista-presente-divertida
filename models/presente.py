@@ -6,9 +6,9 @@ class Presente(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(100), nullable=False)
-    descricao = db.Column(db.String(500), nullable=False)  # Mudei de Text para String
-    valor_total = db.Column(db.Numeric(10, 2), nullable=False)  # Mudei de Float para Numeric
-    valor_arrecadado = db.Column(db.Numeric(10, 2), default=0.0)  # Mudei de Float para Numeric
+    descricao = db.Column(db.String(500), nullable=False) 
+    valor_total = db.Column(db.Numeric(10, 2), nullable=False)  
+    valor_arrecadado = db.Column(db.Numeric(10, 2), default=0.0)  
     ativo = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     imagem_url = db.Column(db.String(300), default='/static/images/gift-default.jpg')

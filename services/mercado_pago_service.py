@@ -1,9 +1,40 @@
 import os
 import logging
 import mercadopago
+import functools
+import time
 from config import Config
 
 logger = logging.getLogger(__name__)
+
+def with_retry(max_retries=3, delay=1):
+    """Decorator para adicionar retry em funções"""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            last_error = None
+            for attempt in range(max_retries):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    last_error = e
+                    logger.warning(
+                        "retry_attempt",
+                        function=func.__name__,
+                        attempt=attempt + 1,
+                        max_retries=max_retries,
+                        error=str(e)
+                    )
+                    if attempt < max_retries - 1:
+                        time.sleep(delay * (attempt + 1))
+            logger.error(
+                "max_retries_reached",
+                function=func.__name__,
+                error=str(last_error)
+            )
+            raise last_error
+        return wrapper
+    return decorator
 
 class MercadoPagoService:
     def __init__(self):
@@ -11,7 +42,17 @@ class MercadoPagoService:
         access_token = Config.MERCADOPAGO_ACCESS_TOKEN
         if not access_token:
             raise ValueError("⚠️ MERCADOPAGO_ACCESS_TOKEN não configurado corretamente.")
+        
+        # Configuração com timeout e opções de segurança
         self.sdk = mercadopago.SDK(access_token)
+        
+        # Teste de conexão na inicialização
+        try:
+            self.testar_credenciais()
+            logger.info("mercadopago_initialized", message="SDK do Mercado Pago inicializado com sucesso")
+        except Exception as e:
+            logger.error("mercadopago_initialization_error", error=str(e))
+            # Não levanta exceção para permitir que a aplicação continue funcionando
 
     def _limpar_telefone(self, telefone):
         """Remove caracteres especiais do telefone e valida formato"""
@@ -53,7 +94,8 @@ class MercadoPagoService:
                 raise ValueError("CPF inválido")
                 
         return numeros
-
+    
+    @with_retry(max_retries=3, delay=1)
     def criar_preferencia_pagamento(self, contribuicao, presente, base_url):
         """Cria uma preferência de pagamento no Mercado Pago"""
         try:
@@ -172,6 +214,7 @@ class MercadoPagoService:
             traceback.print_exc()
             return None
 
+    @with_retry(max_retries=3, delay=1)
     def processar_webhook(self, data):
         """Processa os webhooks enviados pelo Mercado Pago (payment e merchant_order)"""
         try:
@@ -245,6 +288,7 @@ class MercadoPagoService:
             traceback.print_exc()
             return None
 
+    @with_retry(max_retries=2, delay=1)
     def testar_credenciais(self):
         """Cria uma preferência de teste para validar o token"""
         try:
@@ -266,4 +310,24 @@ class MercadoPagoService:
 
         except Exception as e:
             print(f"❌ Erro ao testar credenciais do Mercado Pago: {e}")
+            return None
+
+    @with_retry(max_retries=3, delay=1)
+    def consultar_pagamento(self, payment_id):
+        """Consulta informações de um pagamento específico"""
+        try:
+            payment_info = self.sdk.payment().get(payment_id)
+            return payment_info.get("response", {})
+        except Exception as e:
+            logger.error("payment_query_error", payment_id=payment_id, error=str(e))
+            return None
+
+    @with_retry(max_retries=3, delay=1)
+    def consultar_merchant_order(self, order_id):
+        """Consulta informações de uma merchant order específica"""
+        try:
+            order_info = self.sdk.merchant_order().get(order_id)
+            return order_info.get("response", {})
+        except Exception as e:
+            logger.error("merchant_order_query_error", order_id=order_id, error=str(e))
             return None
