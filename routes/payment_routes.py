@@ -67,16 +67,15 @@ class ValidationService:
             errors.append('Presente não encontrado')
             return errors
             
-        if not presente.ativo:  # CORRIGIDO: active → ativo
+        if not presente.ativo:
             errors.append('Este presente não está mais disponível')
             
-        # Valida valor
+        # Valida valor (APENAS valor positivo)
         try:
             valor_float = float(str(valor).replace(',', '.'))
             if valor_float <= 0:
                 errors.append('Valor deve ser maior que zero')
-            elif valor_float > presente.valor_total:
-                errors.append('Valor excede o valor total do presente')
+            # REMOVIDO: Verificação de valor máximo
         except (ValueError, TypeError):
             errors.append('Valor inválido')
             
