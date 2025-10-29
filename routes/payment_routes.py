@@ -107,23 +107,24 @@ class ValidationService:
 @present_bp.route('/')
 def index():
     """Página principal com lista de presentes"""
-    presents = Presente.query.filter_by(ativo=True).all()  # CORRIGIDO: active → ativo
-    return render_template('index.html', presents=presents)
+    presentes = Presente.query.filter_by(ativo=True).all()
+    return render_template('index.html', presentes=presentes)
+
 
 @present_bp.route('/api/presentes')
 def get_presents():
     """API para obter lista de presentes"""
     try:
-        presents = Presente.query.filter_by(ativo=True).all()  # CORRIGIDO: active → ativo
+        presents = Presente.query.filter_by(ativo=True).all()
         presents_data = []
-        for present in presents:
+        for presente in presentes:
             presents_data.append({
-                'id': present.id,
-                'nome': present.nome,
-                'descricao': present.descricao,
-                'valor_total': float(present.valor_total),
-                'imagem_url': present.imagem_url,
-                'ativo': present.ativo  # CORRIGIDO: active → ativo
+                'id': presente.id,
+                'nome': presente.nome,
+                'descricao': presente.descricao,
+                'valor_total': float(presente.valor_total),
+                'imagem_url': presente.imagem_url,
+                'ativo': presente.ativo  # CORRIGIDO: active → ativo
             })
         return jsonify({'success': True, 'presents': presents_data})
     except Exception as e:

@@ -12,15 +12,16 @@
             {% for presente in presentes %}
             <div class="col-md-6 col-lg-4 mb-4">
                 <div class="card gift-card h-100">
+                    
                     <img src="{{ presente.imagem_url or 'https://via.placeholder.com/300x200?text=Presente' }}" 
                          class="card-img-top gift-image" 
                          alt="{{ presente.nome }}"
                          onerror="this.src='https://via.placeholder.com/300x200?text=Presente'">
-
+                    
                     <div class="card-body text-center">
                         <h5 class="card-title">{{ presente.nome }}</h5>
                         <p class="card-text text-muted small">{{ presente.descricao }}</p>
-
+                        
                         <div class="gift-price mb-3">
                             <span class="h4 text-primary">R$ {{ "%.2f"|format(presente.valor_total) }}</span>
                         </div>
@@ -32,13 +33,12 @@
                             </small>
                         </div>
                     </div>
-
+                    
                     <div class="card-footer bg-transparent border-0 pb-3">
                         <button class="btn btn-primary w-100 btn-presentear" 
                                 data-presente-id="{{ presente.id }}"
                                 data-presente-nome="{{ presente.nome }}"
-                                data-presente-valor="{{ presente.valor_total }}"
-                                data-valor-restante="{{ presente.valor_total }}">
+                                data-presente-valor="{{ presente.valor_total }}">
                             <i class="fas fa-gift me-2"></i>Presentear
                         </button>
                     </div>
@@ -58,10 +58,10 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <form id="formPagamento" novalidate>
+                <form id="formPagamento">
                     <input type="hidden" id="presente_id" name="presente_id">
                     <input type="hidden" id="valor" name="valor">
-
+                    
                     <div class="mb-3">
                         <label class="form-label">Valor do Presente</label>
                         <div class="alert alert-info py-2">
@@ -69,12 +69,12 @@
                             <small class="text-center d-block mt-1">Valor fixo do presente</small>
                         </div>
                     </div>
-
+                    
                     <div class="mb-3">
                         <label for="nome" class="form-label">Seu Nome *</label>
                         <input type="text" class="form-control" id="nome" name="nome" required>
                     </div>
-
+                    
                     <div class="mb-3">
                         <label for="email" class="form-label">Seu Email *</label>
                         <input type="email" class="form-control" id="email" name="email" required>
@@ -82,16 +82,14 @@
 
                     <div class="mb-3">
                         <label for="cpf" class="form-label">CPF *</label>
-                        <input type="text" class="form-control" id="cpf" name="cpf" 
-                               placeholder="000.000.000-00" required>
+                        <input type="text" class="form-control" id="cpf" name="cpf" required>
                     </div>
 
                     <div class="mb-3">
                         <label for="telefone" class="form-label">Telefone/WhatsApp *</label>
-                        <input type="tel" class="form-control" id="telefone" name="telefone" 
-                               placeholder="(11) 99999-9999" required>
+                        <input type="tel" class="form-control" id="telefone" name="telefone" required>
                     </div>
-
+                    
                     <div class="mb-3">
                         <label for="mensagem" class="form-label">Mensagem para o casal (opcional)</label>
                         <textarea class="form-control" id="mensagem" name="mensagem" rows="2" 
@@ -109,9 +107,9 @@
                         </div>
                     </div>
 
-                    <div id="info-pix" class="alert alert-info mb-0">
+                    <div id="info-pix" class="alert alert-info">
                         <h6><i class="fas fa-info-circle me-2"></i>Como pagar via PIX:</h6>
-                        <ol class="small mb-0 ps-3">
+                        <ol class="small mb-0">
                             <li>Faça o PIX para: <strong>83991314075</strong></li>
                             <li>Envie o comprovante para nós</li>
                             <li>Seu presente será confirmado em até 24h</li>
@@ -129,7 +127,7 @@
     </div>
 </div>
 
-<!-- MODAL CONFIRMAÇÃO PIX -->
+<!-- MODAL PIX -->
 <div class="modal fade" id="modalPix" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -145,7 +143,7 @@
                         <i class="fas fa-copy me-1"></i>Copiar Novamente
                     </button>
                 </div>
-
+                
                 <p class="small text-muted">
                     <strong>Instruções:</strong><br>
                     1. Abra seu app do banco<br>
@@ -153,7 +151,7 @@
                     3. Envie o valor de <strong>R$ <span id="valor-pix">0.00</span></strong><br>
                     4. Envie o comprovante para nós
                 </p>
-
+                
                 <div class="mt-3">
                     <a href="/" class="btn btn-primary">Voltar para Presentes</a>
                 </div>
@@ -162,18 +160,103 @@
     </div>
 </div>
 
-<!-- MODAL LOADING -->
-<div class="modal fade" id="modalLoading" tabindex="-1" data-bs-backdrop="static">
-    <div class="modal-dialog modal-sm">
-        <div class="modal-content">
-            <div class="modal-body text-center">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Carregando...</span>
-                </div>
-                <p class="mt-2 mb-0">Processando pagamento...</p>
-            </div>
-        </div>
-    </div>
-</div>
+<script>
+class WeddingGiftApp {
+    constructor() {
+        this.initEventListeners();
+    }
 
+    initEventListeners() {
+        // Botões de presentear
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('btn-presentear')) {
+                this.openPagamentoModal(e.target);
+            }
+        });
+
+        // Botão Pagar com PIX
+        document.getElementById('btnPagarPix')?.addEventListener('click', () => {
+            this.processarPix();
+        });
+    }
+
+    openPagamentoModal(button) {
+        const presenteId = button.dataset.presenteId;
+        const presenteNome = button.dataset.presenteNome;
+        const presenteValor = parseFloat(button.dataset.presenteValor);
+
+        // Preenche o modal
+        document.getElementById('modal-presente-nome').textContent = presenteNome;
+        document.getElementById('presente_id').value = presenteId;
+        document.getElementById('valor').value = presenteValor;
+        document.getElementById('valor-exibido').textContent = presenteValor.toFixed(2);
+        
+        // Abre o modal
+        const modal = new bootstrap.Modal(document.getElementById('modalPagamento'));
+        modal.show();
+    }
+
+    async processarPix() {
+        const form = document.getElementById('formPagamento');
+        
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+
+        const formData = new FormData(form);
+        const data = {
+            presente_id: parseInt(formData.get('presente_id')),
+            nome: formData.get('nome'),
+            email: formData.get('email'),
+            cpf: formData.get('cpf'),
+            telefone: formData.get('telefone'),
+            valor: parseFloat(formData.get('valor')),
+            mensagem: formData.get('mensagem'),
+            metodo_pagamento: 'pix'
+        };
+
+        try {
+            const response = await fetch('/api/contribuir', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                // Fecha o modal de pagamento
+                bootstrap.Modal.getInstance(document.getElementById('modalPagamento')).hide();
+                
+                // Preenche e abre modal PIX
+                document.getElementById('valor-pix').textContent = data.valor.toFixed(2);
+                this.copiarChavePix();
+                
+                const modalPix = new bootstrap.Modal(document.getElementById('modalPix'));
+                modalPix.show();
+            } else {
+                throw new Error(result.error);
+            }
+
+        } catch (error) {
+            alert('Erro: ' + error.message);
+        }
+    }
+
+    copiarChavePix() {
+        const chavePix = '83991314075';
+        navigator.clipboard.writeText(chavePix).then(() => {
+            console.log('Chave PIX copiada: ' + chavePix);
+        });
+    }
+}
+
+// Inicializa a aplicação
+document.addEventListener('DOMContentLoaded', () => {
+    new WeddingGiftApp();
+});
+</script>
 {% endblock %}
