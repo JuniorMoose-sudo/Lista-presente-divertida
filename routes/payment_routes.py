@@ -67,7 +67,7 @@ class ValidationService:
             errors.append('Presente não encontrado')
             return errors
             
-        if not presente.active:
+        if not presente.ativo:  # CORRIGIDO: active → ativo
             errors.append('Este presente não está mais disponível')
             
         # Valida valor
@@ -93,7 +93,7 @@ class ValidationService:
         if not presente:
             return False, 'Presente não encontrado'
             
-        if not presente.active:
+        if not presente.ativo:  # CORRIGIDO: active → ativo
             return False, 'Presente não está mais disponível'
             
         return True, None
@@ -107,14 +107,14 @@ class ValidationService:
 @present_bp.route('/')
 def index():
     """Página principal com lista de presentes"""
-    presents = Presente.query.filter_by(active=True).all()
+    presents = Presente.query.filter_by(ativo=True).all()  # CORRIGIDO: active → ativo
     return render_template('index.html', presents=presents)
 
 @present_bp.route('/api/presentes')
 def get_presents():
     """API para obter lista de presentes"""
     try:
-        presents = Presente.query.filter_by(active=True).all()
+        presents = Presente.query.filter_by(ativo=True).all()  # CORRIGIDO: active → ativo
         presents_data = []
         for present in presents:
             presents_data.append({
@@ -123,7 +123,7 @@ def get_presents():
                 'descricao': present.descricao,
                 'valor_total': float(present.valor_total),
                 'imagem_url': present.imagem_url,
-                'active': present.active
+                'ativo': present.ativo  # CORRIGIDO: active → ativo
             })
         return jsonify({'success': True, 'presents': presents_data})
     except Exception as e:
