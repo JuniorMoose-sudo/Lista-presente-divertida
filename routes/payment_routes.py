@@ -106,8 +106,12 @@ class ValidationService:
 @present_bp.route('/')
 def index():
     """Página principal com lista de presentes"""
+    from config import Config
     presentes = Presente.query.filter_by(ativo=True).all()
-    return render_template('index.html', presentes=presentes)
+    return render_template('index.html', 
+                         presentes=presentes,
+                         noivo_nome=Config.NOIVO_NOME,
+                         data_casamento=Config.DATA_CASAMENTO)
 
 
 @present_bp.route('/api/presentes')
