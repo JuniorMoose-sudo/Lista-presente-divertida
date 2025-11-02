@@ -96,17 +96,29 @@
                                   placeholder="Deixe uma mensagem carinhosa..."></textarea>
                     </div>
 
+                    <!-- Métodos de pagamento -->
                     <div class="mb-3">
                         <label class="form-label">Método de Pagamento *</label>
-                        <div class="form-check">
+
+                        <div class="form-check mb-2">
                             <input class="form-check-input" type="radio" name="metodo_pagamento" 
                                    id="pix" value="pix" checked>
                             <label class="form-check-label" for="pix">
                                 <i class="fas fa-qrcode me-2"></i>PIX (Chave: 83991314075)
                             </label>
                         </div>
+
+                        <!-- NOVA OPÇÃO: LINK DE PAGAMENTO -->
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="metodo_pagamento" 
+                                   id="link" value="link">
+                            <label class="form-check-label" for="link">
+                                <i class="fas fa-credit-card me-2"></i>Pagamento Online (Cartão)
+                            </label>
+                        </div>
                     </div>
 
+                    <!-- PIX INFO -->
                     <div id="info-pix" class="alert alert-info">
                         <h6><i class="fas fa-info-circle me-2"></i>Como pagar via PIX:</h6>
                         <ol class="small mb-0">
@@ -115,8 +127,21 @@
                             <li>Seu presente será confirmado em até 24h</li>
                         </ol>
                     </div>
+
+                    <!-- NOVO BLOCO: LINK DE PAGAMENTO -->
+                    <div id="info-link" class="alert alert-success d-none text-center">
+                        <h6><i class="fas fa-link me-2"></i>Pagamento Online Seguro</h6>
+                        <p class="small mb-2">Clique abaixo para abrir a página de pagamento:</p>
+                        <a href="http://link.mercadopago.com.br/listadecasamentojk" target="_blank" class="btn btn-success">
+                            💳 Ir para pagamento
+                        </a>
+                        <p class="small text-muted mt-2 mb-0">
+                            Após o pagamento, envie o comprovante para confirmação.
+                        </p>
+                    </div>
                 </form>
             </div>
+
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                 <button type="button" class="btn btn-success" id="btnPagarPix">
@@ -164,6 +189,7 @@
 class WeddingGiftApp {
     constructor() {
         this.initEventListeners();
+        this.initPaymentMethodToggle();
     }
 
     initEventListeners() {
@@ -176,8 +202,34 @@ class WeddingGiftApp {
 
         // Botão Pagar com PIX
         document.getElementById('btnPagarPix')?.addEventListener('click', () => {
-            this.processarPix();
+            this.processarPagamento();
         });
+    }
+
+    initPaymentMethodToggle() {
+        const pixRadio = document.getElementById('pix');
+        const linkRadio = document.getElementById('link');
+        const infoPix = document.getElementById('info-pix');
+        const infoLink = document.getElementById('info-link');
+        const btnPix = document.getElementById('btnPagarPix');
+
+        const atualizarMetodo = () => {
+            if (linkRadio.checked) {
+                infoPix.classList.add('d-none');
+                infoLink.classList.remove('d-none');
+                btnPix.style.display = 'none';
+            } else {
+                infoPix.classList.remove('d-none');
+                infoLink.classList.add('d-none');
+                btnPix.style.display = 'inline-block';
+            }
+        };
+
+        pixRadio.addEventListener('change', atualizarMetodo);
+        linkRadio.addEventListener('change', atualizarMetodo);
+        
+        // Inicializar estado
+        atualizarMetodo();
     }
 
     openPagamentoModal(button) {
@@ -196,7 +248,7 @@ class WeddingGiftApp {
         modal.show();
     }
 
-    async processarPix() {
+    async processarPagamento() {
         const form = document.getElementById('formPagamento');
         
         if (!form.checkValidity()) {
@@ -204,6 +256,18 @@ class WeddingGiftApp {
             return;
         }
 
+        const metodoPagamento = document.querySelector('input[name="metodo_pagamento"]:checked').value;
+
+        if (metodoPagamento === 'link') {
+            // Redireciona para o link de pagamento
+            window.open('https://link-de-pagamento-unico.com', '_blank');
+            
+            // Fecha o modal
+            bootstrap.Modal.getInstance(document.getElementById('modalPagamento')).hide();
+            return;
+        }
+
+        // Processamento PIX (código original)
         const formData = new FormData(form);
         const data = {
             presente_id: parseInt(formData.get('presente_id')),
@@ -258,5 +322,13 @@ class WeddingGiftApp {
 document.addEventListener('DOMContentLoaded', () => {
     new WeddingGiftApp();
 });
+
+// Função global para copiar chave PIX (mantida para compatibilidade)
+function copiarChavePix() {
+    const chavePix = '83991314075';
+    navigator.clipboard.writeText(chavePix).then(() => {
+        console.log('Chave PIX copiada: ' + chavePix);
+    });
+}
 </script>
 {% endblock %}
