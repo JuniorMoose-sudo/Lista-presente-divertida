@@ -15,7 +15,7 @@ def init_sample_data():
             {
                 "nome": "Só para dizer que não dei nada",
                 "descricao": "",
-                "valor_total": 79.90,
+                "valor_total": 59.90,
                 "ativo": True,
                 "imagem_url": "/static/images/julios.png"
             },
@@ -57,7 +57,7 @@ def init_sample_data():
             {
                 "nome": "Taxa para não jogar o buquê para o seu par",
                 "descricao": "",
-                "valor_total": 119.90,
+                "valor_total": 79.90,
                 "ativo": True,
                 "imagem_url": "/static/images/buque.png"
             }
