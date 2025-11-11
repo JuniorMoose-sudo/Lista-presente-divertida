@@ -15,14 +15,14 @@ def init_sample_data():
             {
                 "nome": "Só para dizer que não dei nada",
                 "descricao": "",
-                "valor_total": 89.90,
+                "valor_total": 79.90,
                 "ativo": True,
                 "imagem_url": "/static/images/julios.png"
             },
             {
                 "nome": "Para o noivo estar coberto de razão",
                 "descricao": "",
-                "valor_total": 79.90,
+                "valor_total": 69.90,
                 "ativo": True,
                 "imagem_url": "/static/images/cobertor.png"
             },
@@ -43,14 +43,14 @@ def init_sample_data():
             {
                 "nome": "Pagar a paciência da noiva",
                 "descricao": "",
-                "valor_total": 79.90,
+                "valor_total": 69.90,
                 "ativo": True,
                 "imagem_url": "/static/images/paciencia.png"
             },
             {
                 "nome": "Deus tocou seu coração",
                 "descricao": "",
-                "valor_total": 119.90,
+                "valor_total": 99.90,
                 "ativo": True,
                 "imagem_url": "/static/images/sourica.png"
             },
