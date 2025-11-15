@@ -9,7 +9,7 @@
     <link href="{{ url_for('static', filename='css/wedding-theme.css') }}" rel="stylesheet">
 </head>
 <body>
-    <!-- Header Romântico -->
+    <!-- Header Romântico Melhorado -->
     <header class="wedding-header">
         <div class="container text-center py-5">
             <h1 class="display-4 fw-light text-white">{{ noivo_nome }}</h1>
@@ -19,6 +19,43 @@
                 {{ data_casamento }}
                 <i class="fas fa-heart ms-2"></i>
             </div>
+            
+            <!-- Nova seção de destaque para lista de presentes -->
+            <div class="gift-highlight mt-4">
+                <div class="row justify-content-center">
+                    <div class="col-lg-8">
+                        <div class="gift-cta p-4 rounded">
+                            <h3 class="text-white mb-3">
+                                <i class="fas fa-gift me-2"></i>Nossa Lista de Presentes
+                            </h3>
+                            <p class="text-white mb-3">Escolha um presente especial e faça parte do nosso sonho!</p>
+                            
+                            <!-- Destaque para métodos de pagamento -->
+                            <div class="payment-methods mt-3">
+                                <span class="badge bg-light text-dark me-2 p-2">
+                                    <i class="fas fa-credit-card me-1"></i>Cartão de Crédito
+                                </span>
+                                <span class="badge bg-success me-2 p-2">
+                                    <i class="fas fa-mobile-alt me-1"></i>PIX
+                                </span>
+                            </div>
+                            
+                            <div class="mt-3">
+                                <a href="#lista-presentes" class="btn btn-light btn-lg rounded-pill px-4">
+                                    <i class="fas fa-arrow-down me-2"></i>Ver Lista de Presentes
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Elemento decorativo seta para baixo -->
+        <div class="scroll-indicator">
+            <a href="#lista-presentes" class="text-white">
+                <i class="fas fa-chevron-down fa-2x"></i>
+            </a>
         </div>
     </header>
 
